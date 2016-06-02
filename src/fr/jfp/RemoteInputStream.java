@@ -3,15 +3,19 @@ package fr.jfp;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * An {@link InputStream} on a file served by an instance of {@link JFPProvider}.
+ * 
+ * @author Matthieu Labas
+ */
 public class RemoteInputStream extends InputStream {
 	
-	public static final int INVALID = -1;
-	public static final int BUFFER_SIZE = 4096;
-	
+	/** The remote absolute path to the file. */
 	private String remoteFile;
 	
 	private int fileID;
 	
+	/** The client used to transfer commands to its connected {@link JFPProvider}. */
 	private JFPClient cli;
 	
 	RemoteInputStream(String remoteFile, int fileID, JFPClient cli) {
@@ -31,20 +35,15 @@ public class RemoteInputStream extends InputStream {
 	@Override
 	public void close() throws IOException {
 		if (cli == null)
-			throw new IOException("Already closed");
+			return;
 		
-		try {
-			cli.send(new MsgClose(fileID));
-		} catch (IOException e) {
-			throw new IOException("Timeout en fermeture de "+remoteFile, e);
-		} finally {
-			cli.risClosed(this);
-			cli = null;
-		}
+		cli.send(new MsgClose(fileID));
+		cli.risClosed(this);
+		cli = null;
 	}
 	
 	/**
-	 * @deprecated Use {@link #read(byte[], int, int)}, more bandwidth-friendly.
+	 * @deprecated Use more bandwidth-friendly {@link #read(byte[], int, int)}.
 	 */
 	@Override
 	@Deprecated

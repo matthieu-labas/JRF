@@ -25,11 +25,11 @@ public class JFPClient extends Thread {
 	
 	private Socket sok;
 	
-	/** Map of remotely open files. */
+	/** Map of remotely open files. Key is the file ID. */
 	private Map<Integer,RemoteInputStream> remoteOpened;
 	
 	/** List of {@link Message}s received that can be queried by {@link RemoteInputStream}s looking
-	 * for a reply-message to their command message. */
+	 * for a reply message to their command message. */
 	private List<Message> msgQueue;
 	
 	private volatile boolean goOn;
@@ -51,6 +51,11 @@ public class JFPClient extends Thread {
 		this(new Socket(addr.getAddress(), addr.getPort()));
 	}
 	
+	/**
+	 * Called by {@code RemoteInputStream} when its stream has been closed, so it can be removed
+	 * from {@link #remoteOpened}.
+	 * @param ris The closed {@code RemoteInputStream} to remove.
+	 */
 	synchronized void risClosed(RemoteInputStream ris) {
 		remoteOpened.remove(ris.getFileID());
 	}
@@ -64,14 +69,16 @@ public class JFPClient extends Thread {
 				log.warning(getName()+": Exception while closing remote file "+ris+": "+e.getMessage());
 			}
 		}
+		remoteOpened.clear();
 		
 		// Close the connection
-		gracefulClose();
+		gracefulClose(sok);
 	}
 	
+	/** Stops the Client and closes its connection to the Server. */
 	public void requestStop() {
 		goOn = false;
-		gracefulClose();
+		close();
 	}
 	
 	/**
@@ -88,7 +95,7 @@ public class JFPClient extends Thread {
 		if (m instanceof MsgAck) {
 			MsgAck msg = (MsgAck)m;
 			if (msg.msg != null) {
-				if (msg.code == MsgAck.WARN)
+				if (msg.code == MsgAck.WARN) // File not found
 					throw new FileNotFoundException(msg.msg);
 				throw new IOException(msg.msg);
 			}
@@ -103,10 +110,9 @@ public class JFPClient extends Thread {
 	}
 	
 	/**
-	 * Send a message and potentially process a message received as a reply to the message sent.
-	 * @param ris The {@code RemoteInputStream} sending the command.
+	 * Send a command message to the remote {@link JFPProvider}.
 	 * @param cmd The command message to send.
-	 * @return The message number.
+	 * @return The message number {@code cmd.num}.
 	 * @throws IOException on error while sending.
 	 */
 	int send(Message cmd) throws IOException {
@@ -115,12 +121,23 @@ public class JFPClient extends Thread {
 	}
 	
 	/**
-	 * Get received message sent as a reply to the given message number, so that the returned
-	 * message {@code replyTo} member equals the given {@code msgNum}.
+	 * <p>Get received message sent as a reply to the given message number, so that
+	 * {@code ret.replyTo == msgNum}. In all cases, if the message was already received, it will be
+	 * returned immediately.</p>
+	 * <p><ul>
+	 * <li>If the given {@code timeout} is {@code < 0}, the call will return immediately the reply
+	 * message if it was already received, or {@code null} if it wasn't, which can be useful to
+	 * create an external active polling.</li>
+	 * <li>If {@code 0}, the call will block until the reply message is received or an exception is
+	 * thrown.</li>
+	 * <li>If {@code > 0}, the call will block at most {@code timeout} ms until the reply message is
+	 * received or an exception is thrown. If the message was not received during this {@code timeout},
+	 * {@code null} will be returned.</li></p>
 	 * @param msgNum The message number to which a reply message was sent.
 	 * @param timeout {@code >= 0} if the call should be blocking, waiting for the reply message to
 	 * 		arrive in the given {@code timeout} ms.
-	 * @return The first received message, sent as a reply to message #{@code msgNum}.
+	 * @return The first received message, sent as a reply to message #{@code msgNum}, or {@code null}
+	 * 		if no such message was received during the given {@code timeout}.
 	 */
 	Message getReply(int msgNum, int timeout) {
 		synchronized (msgQueue) {
@@ -140,16 +157,15 @@ public class JFPClient extends Thread {
 			long t0 = System.currentTimeMillis();
 			for (;;) {
 				long t = (timeout == 0 ? 0 : timeout - (System.currentTimeMillis() - t0));
-				try { msgQueue.wait(t); } catch (InterruptedException e) { }
+				try { msgQueue.wait(t); } catch (InterruptedException e) { } // Already in synchronized (msgQueue)
 				if (msgQueue.size() != sz) { // New message received
 					Message msg = msgQueue.get(sz);
-					if (msg.replyTo == msgNum) {
+					if (msg.replyTo == msgNum) { // Not for us: go back to sleep
 						msgQueue.remove(sz);
 						return msg;
 					}
 				}
-				// Timeout expired: return null
-				if (timeout > 0 && (System.currentTimeMillis() - t0) >= timeout)
+				if (timeout > 0 && (System.currentTimeMillis() - t0) >= timeout) // Timeout expired: return null
 					return null;
 			}
 		}
@@ -157,9 +173,9 @@ public class JFPClient extends Thread {
 	
 	/**
 	 * Performs a graceful close on the given Socket. Data still in the socket input buffer will be
-	 * discarded.
+	 * silently discarded.
 	 * @param sok The socket to gracefully close.
-	 * @see http://stackoverflow.com/a/9399617/1098603 :)
+	 * @see <a href="http://stackoverflow.com/a/9399617/1098603">http://stackoverflow.com/a/9399617/1098603</a> :)
 	 */
 	public static void gracefulClose(Socket sok) {
 		try {
@@ -180,10 +196,6 @@ public class JFPClient extends Thread {
 		}
 	}
 	
-	private void gracefulClose() {
-		gracefulClose(sok);
-	}
-	
 	@Override
 	public void run() {
 		while (goOn) {
@@ -191,12 +203,12 @@ public class JFPClient extends Thread {
 				log.fine(getName()+": waiting for message...");
 				Message msg = Message.receive(sok);
 				log.fine(getName()+": received message "+msg);
-				if (msg.replyTo > 0) { // Reply message: add it to the list and wakeup all RemoteInputStreams waiting for a reply
+				if (msg.replyTo > 0) { // Reply message: add it to msgQueue and wakeup all RemoteInputStreams waiting for a reply
 					synchronized (msgQueue) {
 						msgQueue.add(msg);
 						msgQueue.notifyAll();
-						continue;
 					}
+					continue;
 				}
 				
 				// Messages spontaneously sent by the JFPFileProvider
@@ -210,7 +222,7 @@ public class JFPClient extends Thread {
 						ris.spontaneousMessage(msg);
 					}
 				} else {
-					log.severe("Unknown message "+msg);
+					log.severe(getName()+": Unknown message "+msg);
 				}
 			} catch (SocketTimeoutException e) {
 				continue;

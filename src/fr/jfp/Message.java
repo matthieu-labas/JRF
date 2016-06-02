@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 /**
@@ -39,12 +38,13 @@ public abstract class Message {
 	/** Default package for Messages. */
 	public static final String PACKAGE = Message.class.getPackage().getName();
 	
-	/** Charset to encode {@code String}s. */
+	/** Charset to encode {@code String}s ({@code UTF-8}). */
 	public static final Charset charset = Charset.forName("UTF-8");
 	
 	public static final byte[] MARKER = "_JFP".getBytes(charset);
 	
-	private static final AtomicInteger numCounter = new AtomicInteger(0);
+	/** Message counter. Its access should be {@code synchronized} on {@code Message.class}. */
+	private static volatile int numCounter = 0;
 	
 	/** Message number. */
 	int num;
@@ -53,12 +53,17 @@ public abstract class Message {
 	int replyTo;
 	
 	Message(int replyTo) {
-		num = numCounter.incrementAndGet();
 		this.replyTo = replyTo;
+		synchronized (Message.class) {
+			num = ++numCounter;
+		}
 	}
 	
 	Message() {
 		this(-1);
+	}
+	
+	void initNum() {
 	}
 	
 	/**
@@ -76,13 +81,11 @@ public abstract class Message {
 			data.writeInt(replyTo); // Reply to
 			data.writeString(cls); // Type
 			data.writeInt(bb.size()); // Body size
-			data.write(bb.getArray(), 0, bb.size()); // Body
-			byte[] buf = data.getArray();
+			data.write(bb.getRawArray(), 0, bb.size()); // Body
+			byte[] buf = data.getRawArray();
 			int len = data.size();
-			log.finest("Sending: "+debug(buf, len));
-			String s = Thread.currentThread().getName()+" sending message "+this+" ("+bb.size()+" body bytes)";
-//			System.out.println(s);
-			log.info(s);
+			log.info(Thread.currentThread().getName()+" sending message "+this+" ("+bb.size()+" body bytes)");
+			log.finest(Thread.currentThread().getName()+"\t"+debug(buf, len));
 			sok.getOutputStream().write(buf, 0, len);
 		} finally {
 			bb.close();
@@ -101,12 +104,12 @@ public abstract class Message {
 		return sb.toString();
 	}
 	
-//	protected static void writeString(String str, DataOutput data) throws IOException {
-//		byte[] buf = str.getBytes(charset);
-//		data.writeInt(buf.length);
-//		data.write(buf, 0, buf.length);
-//	}
-	
+	/**
+	 * Utility method to read a {@code String} from a {@code DataInput}, as encoded by {@link ByteBufferOut#writeString(String)}.
+	 * @param data The {@code DataInput} from which to read the {@code String}.
+	 * @return The {@code String}.
+	 * @throws IOException from reading {@code data}.
+	 */
 	protected static String readString(DataInput data) throws IOException {
 		int sz = data.readInt();
 		if (sz < 0)
@@ -154,6 +157,16 @@ public abstract class Message {
 		return getClass().getSimpleName()+"/"+num+(replyTo <= 0 ? "" : ">"+replyTo);
 	}
 	
+	/**
+	 * Receive and decode a message by reading a {@code Socket}. The appropriate {@code Message}
+	 * subclass is instanciated by reflection, using the nullary constructor of the decoded class
+	 * name. If the class cannot be found in the classpath or no nullary constructor exists, an
+	 * {@code IOException} is thrown.
+	 * @param sok The socket to read from.
+	 * @return The decoded message.
+	 * @throws IOException when reading from the socket, or when the {@code Message} subclass could
+	 * 		not be instanciated, or when the decoding could not be performed.
+	 */
 	static Message receive(Socket sok) throws IOException {
 		DataInputStream dis = new DataInputStream(sok.getInputStream()); // Do NOT close this DataInputStream, as it will cascade-close the socket InputStream, cascade-closing the socket itself!
 		byte[] mrk = new byte[MARKER.length];
@@ -173,7 +186,10 @@ public abstract class Message {
 			throw new IOException("Class not found "+clsName+": "+e.getMessage(), e);
 		}
 		try {
-			msg = (Message)cls.newInstance();
+			synchronized (Message.class) {
+				numCounter--; // The nullary constructor will pre-increment numCounter, so to prevent jumps in message numbers we have to counter it ;)
+				msg = (Message)cls.newInstance();
+			}
 		} catch (InstantiationException | IllegalAccessException e) {
 			throw new IOException("Unable to instanciate message of class "+cls+" does it define a nullary constructor?: "+e.getMessage(), e);
 		}
@@ -182,7 +198,8 @@ public abstract class Message {
 		byte[] buf = new byte[dis.readInt()]; // Allocate body size
 		dis.readFully(buf);
 		msg.decode(buf);
-		log.info(Thread.currentThread().getName()+" received message "+msg+" ("+buf.length+" body bytes)");
+		log.fine(Thread.currentThread().getName()+" received message "+msg+" ("+buf.length+" body bytes)");
 		return msg;
 	}
+	
 }

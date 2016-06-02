@@ -20,9 +20,12 @@ class MsgOpen extends Message {
 	int deflate;
 	
 	// Mandatory no-arg constructor
-	public MsgOpen() { }
+	MsgOpen() {
+		super();
+	}
 	
 	public MsgOpen(String file, int deflate) {
+		super();
 		this.file = file;
 		this.deflate = deflate;
 	}
