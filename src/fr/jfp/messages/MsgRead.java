@@ -1,34 +1,35 @@
-package fr.jfp;
+package fr.jfp.messages;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 
-/**
- * <p>Skip request in file.</p>
- * 
- * @author Matthieu Labas
- */
-public class MsgSkip extends MsgFile {
+import fr.jfp.ByteBufferOut;
+
+public class MsgRead extends MsgFile {
 	
-	/** The number of bytes to skip. */
-	long skip;
+	/** The number of bytes to read. */
+	protected int len;
 	
 	// Mandatory no-arg constructor
-	public MsgSkip() {
+	public MsgRead() {
 		super(-1);
 	}
 	
-	public MsgSkip(int fileID, long skip) {
+	public MsgRead(int fileID, int len) {
 		super(fileID);
-		this.skip = skip;
+		this.len = len;
+	}
+	
+	public int getLength() {
+		return len;
 	}
 	
 	@Override
 	protected ByteBufferOut encode() throws IOException {
-		ByteBufferOut bb = new ByteBufferOut(12);
+		ByteBufferOut bb = new ByteBufferOut(4);
 		bb.writeInt(fileID);
-		bb.writeLong(skip);
+		bb.writeInt(len);
 		return bb;
 	}
 	
@@ -36,13 +37,13 @@ public class MsgSkip extends MsgFile {
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
 			fileID = dis.readInt();
-			skip = dis.readLong();
+			len = dis.readInt();
 		}
 	}
 	
 	@Override
 	public String toString() {
-		return stdToString()+" "+skip+" bytes on file "+fileID;
+		return stdToString()+" "+len+" bytes on file "+fileID;
 	}
 	
 }

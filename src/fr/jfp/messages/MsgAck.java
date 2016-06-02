@@ -1,9 +1,11 @@
-package fr.jfp;
+package fr.jfp.messages;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
+import fr.jfp.ByteBufferOut;
 
 /**
  * <p>Message received to acknowledge a command or report an error during execution of the last
@@ -11,7 +13,7 @@ import java.nio.ByteBuffer;
  * 
  * @author Matthieu Labas
  */
-class MsgAck extends MsgFile {
+public class MsgAck extends MsgFile {
 	
 	// Ack codes constants
 	
@@ -23,30 +25,38 @@ class MsgAck extends MsgFile {
 	public static final int ERR = 2;
 	
 	/** Return code. */
-	int code;
+	protected int code;
 	
 	/** An optional error message, in case of an exception being thrown (when {@link #code} is
 	 * {@link #WARN} or {@link #ERR}). {@code null} if not present. */
-	String msg;
+	protected String msg;
 	
 	// Mandatory no-arg constructor
 	public MsgAck() {
 		super(-1);
 	}
 	
-	MsgAck(int replyTo, int fileID, int code, String msg) {
+	public MsgAck(int replyTo, int fileID, int code, String msg) {
 		super(fileID);
 		this.replyTo = replyTo;
 		this.code = code;
 		this.msg = msg;
 	}
 	
-	MsgAck(int replyTo, int fileID) {
+	public MsgAck(int replyTo, int fileID) {
 		this(replyTo, fileID, OK);
 	}
 	
 	MsgAck(int replyTo, int fileID, int code) {
 		this(replyTo, fileID, code, null);
+	}
+	
+	public int getCode() {
+		return code;
+	}
+	
+	public String getMessage() {
+		return msg;
 	}
 	
 	public static ByteBuffer encode(int idFichier, int code, String msg) {

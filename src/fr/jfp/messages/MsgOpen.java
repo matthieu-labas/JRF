@@ -1,8 +1,10 @@
-package fr.jfp;
+package fr.jfp.messages;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+
+import fr.jfp.ByteBufferOut;
 
 /**
  * <p>Open file request.</p>
@@ -11,13 +13,13 @@ import java.io.IOException;
  * 
  * @author Matthieu Labas
  */
-class MsgOpen extends Message {
+public class MsgOpen extends Message {
 	
 	/** The file name to open. */
-	String file;
+	protected String file;
 	
 	/** The requested deflate level for chunk transfer. No deflate requested when {@code <= 0}. */
-	int deflate;
+	protected int deflate;
 	
 	// Mandatory no-arg constructor
 	MsgOpen() {
@@ -28,6 +30,14 @@ class MsgOpen extends Message {
 		super();
 		this.file = file;
 		this.deflate = deflate;
+	}
+	
+	public String getFile() {
+		return file;
+	}
+	
+	public int getDeflate() {
+		return deflate;
 	}
 	
 	@Override

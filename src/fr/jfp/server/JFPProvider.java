@@ -1,4 +1,4 @@
-package fr.jfp;
+package fr.jfp.server;
 
 import java.io.EOFException;
 import java.io.FileInputStream;
@@ -14,6 +14,16 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import fr.jfp.RemoteInputStream;
+import fr.jfp.client.JFPClient;
+import fr.jfp.messages.Message;
+import fr.jfp.messages.MsgAck;
+import fr.jfp.messages.MsgClose;
+import fr.jfp.messages.MsgData;
+import fr.jfp.messages.MsgOpen;
+import fr.jfp.messages.MsgRead;
+import fr.jfp.messages.MsgSkip;
 
 /**
  * <p>The JFP Provider is the {@link JFPClient} Server counterpart, receiving file commands.</p>
@@ -81,16 +91,18 @@ public class JFPProvider extends Thread {
 	
 	// "Open file" command
 	private void handleOpen(MsgOpen m) throws IOException {
-		log.info(getName()+": Request open file "+m.file);
+		int num = m.getNum();
+		String file = m.getFile();
+		log.info(getName()+": Request open file "+file);
 		MsgAck ack;
 		try {
-			InputStream is = new FileInputStream(m.file);
-			ack = new MsgAck(m.num, fileCounter.incrementAndGet());
-			log.fine(getName()+": "+m.file+" > ID "+ack.fileID);
-			localOpened.put(ack.fileID, is);
+			InputStream is = new FileInputStream(file);
+			ack = new MsgAck(num, fileCounter.incrementAndGet());
+			log.fine(getName()+": "+file+" > ID "+ack.getFileID());
+			localOpened.put(ack.getFileID(), is);
 		} catch (FileNotFoundException e) {
-			log.warning(getName()+": File not found "+m.file);
-			ack = new MsgAck(m.num, -1, MsgAck.WARN, e.getMessage());
+			log.warning(getName()+": File not found "+file);
+			ack = new MsgAck(num, -1, MsgAck.WARN, e.getMessage());
 		}
 		try {
 			ack.send(sok);
@@ -102,20 +114,23 @@ public class JFPProvider extends Thread {
 	
 	// "Skip from file" command
 	private void handleSkip(MsgSkip m) throws IOException {
-		log.info(getName()+": Request skip "+m.skip+" bytes on file "+m.fileID);
+		int num = m.getNum();
+		int fileID = m.getFileID();
+		long skip = m.getSkip();
+		log.info(getName()+": Request skip "+skip+" bytes on file "+fileID);
 		MsgAck ack;
-		InputStream is = localOpened.get(m.fileID);
+		InputStream is = localOpened.get(fileID);
 		if (is == null) { // File descriptor not found
-			log.warning(getName()+": Local file ID "+m.fileID+" not found");
-			ack = new MsgAck(m.num, m.fileID, MsgAck.WARN, "File not found");
+			log.warning(getName()+": Local file ID "+fileID+" not found");
+			ack = new MsgAck(num, fileID, MsgAck.WARN, "File not found");
 		} else {
 			try {
-				ack = new MsgAck(m.num, m.fileID, (int)is.skip(m.skip), null); // Perform skip
-				log.fine(getName()+": Actually skipped "+ack.code+" bytes from file "+ack.fileID);
+				ack = new MsgAck(num, fileID, (int)is.skip(skip), null); // Perform skip
+				log.fine(getName()+": Actually skipped "+ack.getCode()+" bytes from file "+fileID);
 			} catch (IOException e) { // Exception during skip
 				String msg = e.getMessage();
-				log.warning(getName()+": Error when skipping "+m.skip+" bytes in file ID "+m.fileID+": "+msg);
-				ack = new MsgAck(m.num, m.fileID, MsgAck.ERR, msg);
+				log.warning(getName()+": Error when skipping "+skip+" bytes in file ID "+fileID+": "+msg);
+				ack = new MsgAck(num, fileID, MsgAck.ERR, msg);
 			}
 		}
 		try {
@@ -128,29 +143,32 @@ public class JFPProvider extends Thread {
 	
 	// "File read" command
 	private void handleRead(MsgRead m) throws IOException {
-		log.info(getName()+": Request read "+m.len+" bytes from file "+m.fileID);
+		int num = m.getNum();
+		int fileID = m.getFileID();
+		int len = m.getLength();
+		log.info(getName()+": Request read "+len+" bytes from file "+fileID);
 		MsgAck ack = null;
 		MsgData data = null;
-		InputStream is = localOpened.get(m.fileID);
+		InputStream is = localOpened.get(fileID);
 		if (is == null) { // File descriptor not found
-			log.warning(getName()+": Local file ID "+m.fileID+" not found");
-			ack = new MsgAck(m.num, m.fileID, MsgAck.WARN, "File not found");
+			log.warning(getName()+": Local file ID "+fileID+" not found");
+			ack = new MsgAck(num, fileID, MsgAck.WARN, "File not found");
 		} else {
 			int n = 0;
 			try {
-				byte[] buf = new byte[m.len];
-				while (n < m.len) {
-					int r = is.read(buf, n, m.len-n);
+				byte[] buf = new byte[len];
+				while (n < len) {
+					int r = is.read(buf, n, len-n);
 					if (r <= 0)
 						break;
 					n += r;
 				}
-				data = new MsgData(m.num, m.fileID, buf, n, 0); // TODO: Handle deflate
-				log.fine(getName()+": read "+n+" bytes from file "+data.fileID);
+				data = new MsgData(num, fileID, buf, n, 0); // TODO: Handle deflate
+				log.fine(getName()+": read "+n+" bytes from file "+fileID);
 			} catch (IOException e) { // Exception during read
 				String msg = e.getMessage();
-				log.warning(getName()+": Error when reading "+n+"/"+m.len+" bytes from file ID "+m.fileID+": "+msg);
-				ack = new MsgAck(m.num, m.fileID, MsgAck.ERR, msg);
+				log.warning(getName()+": Error when reading "+n+"/"+len+" bytes from file ID "+fileID+": "+msg);
+				ack = new MsgAck(num, fileID, MsgAck.ERR, msg);
 			}
 		}
 		try {
@@ -166,16 +184,17 @@ public class JFPProvider extends Thread {
 	
 	// "File close" command
 	private void handleClose(MsgClose m) throws IOException {
-		log.info(getName()+": Request close file "+m.fileID);
-		InputStream is = localOpened.get(m.fileID);
+		int fileID = m.getFileID();
+		log.info(getName()+": Request close file "+fileID);
+		InputStream is = localOpened.get(m.getFileID());
 		if (is == null) { // File descriptor not found
-			log.warning(getName()+": Local file ID "+m.fileID+" not found");
+			log.warning(getName()+": Local file ID "+fileID+" not found");
 		} else {
 			try {
 				is.close();
-				log.fine(getName()+": Closed file "+m.fileID);
+				log.fine(getName()+": Closed file "+fileID);
 			} catch (IOException e) { // Exception during skip
-				log.warning(getName()+": Error when closing file ID "+m.fileID+": "+e.getMessage());
+				log.warning(getName()+": Error when closing file ID "+fileID+": "+e.getMessage());
 			}
 		}
 	}

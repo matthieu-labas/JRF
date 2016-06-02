@@ -1,4 +1,4 @@
-package fr.jfp;
+package fr.jfp.server;
 
 import java.io.File;
 import java.io.IOException;
@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+
+import fr.jfp.RemoteFile;
 
 /**
  * Class listening for connections on a {@code ServerSocket} and creating {@link JFPProvider} instances

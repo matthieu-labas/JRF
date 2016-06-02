@@ -1,4 +1,4 @@
-package fr.jfp;
+package fr.jfp.messages;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -7,24 +7,25 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
+import fr.jfp.ByteBufferOut;
 import fr.jfp.ByteBufferOut.StraightByteArrayOutputStream;
 
-class MsgData extends MsgFile {
+public class MsgData extends MsgFile {
 	
 	/** <p>The chunk data.</p>
 	 * <p>When the message is <em>sent</em>, the content is the original data when no compression
 	 * was requested, or the deflated data when the {@code deflate} parameter is {@code > 0}.<br/>
 	 * When the message is <em>received</em>, the content is always the original data (i.e. it is
 	 * deflated during deserialization).</p> */
-	byte[] data;
+	protected byte[] data;
 	
 	/** Valid number of bytes in {@link #data}. */
-	int len;
+	protected int len;
 	
 	/** The deflate level {@link #data} was deflated with, or {@code <= 0} if {@link data} is
 	 * not deflated. N.B. that the value is not necessary for inflation but is kept for potential
 	 * logging. */
-	int deflate;
+	protected int deflate;
 	
 	// Mandatory no-arg constructor
 	public MsgData() {
@@ -47,6 +48,18 @@ class MsgData extends MsgFile {
 			this.data = deflate(data, deflate);
 		else
 			this.data = data;
+	}
+	
+	public byte[] getData() {
+		return data;
+	}
+	
+	public int getLength() {
+		return len;
+	}
+	
+	public int getDeflate() {
+		return deflate;
 	}
 	
 	@Override

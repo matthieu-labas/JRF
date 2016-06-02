@@ -1,4 +1,4 @@
-package fr.jfp;
+package fr.jfp.client;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -13,6 +13,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+
+import fr.jfp.RemoteInputStream;
+import fr.jfp.messages.Message;
+import fr.jfp.messages.MsgAck;
+import fr.jfp.messages.MsgClose;
+import fr.jfp.messages.MsgFile;
+import fr.jfp.messages.MsgOpen;
+import fr.jfp.server.JFPProvider;
 
 /**
  * The JFP Client is used to send file commands to a {@link JFPProvider}.
@@ -56,7 +64,7 @@ public class JFPClient extends Thread {
 	 * from {@link #remoteOpened}.
 	 * @param ris The closed {@code RemoteInputStream} to remove.
 	 */
-	synchronized void risClosed(RemoteInputStream ris) {
+	public synchronized void risClosed(RemoteInputStream ris) {
 		remoteOpened.remove(ris.getFileID());
 	}
 	
@@ -91,17 +99,19 @@ public class JFPClient extends Thread {
 	public InputStream getRemoteInputStream(String remoteFile) throws IOException {
 		MsgOpen mo = new MsgOpen(remoteFile, 0);
 		mo.send(sok); // Remote open file
-		Message m = getReply(mo.num, 0); // Wait for MsgAck to get file ID
+		Message m = getReply(mo.getNum(), 0); // Wait for MsgAck to get file ID
 		if (m instanceof MsgAck) {
 			MsgAck msg = (MsgAck)m;
-			if (msg.msg != null) {
-				if (msg.code == MsgAck.WARN) // File not found
-					throw new FileNotFoundException(msg.msg);
-				throw new IOException(msg.msg);
+			String err = msg.getMessage();
+			if (err != null) {
+				if (msg.getCode() == MsgAck.WARN) // File not found
+					throw new FileNotFoundException(err);
+				throw new IOException(err);
 			}
-			RemoteInputStream ris = new RemoteInputStream(remoteFile, msg.fileID, this);
+			int fileID = msg.getFileID();
+			RemoteInputStream ris = new RemoteInputStream(remoteFile, fileID, this);
 			synchronized (this) {
-				remoteOpened.put(Integer.valueOf(msg.fileID), ris);
+				remoteOpened.put(Integer.valueOf(fileID), ris);
 			}
 			return ris;
 		} else {
@@ -115,9 +125,9 @@ public class JFPClient extends Thread {
 	 * @return The message number {@code cmd.num}.
 	 * @throws IOException on error while sending.
 	 */
-	int send(Message cmd) throws IOException {
+	public int send(Message cmd) throws IOException {
 		cmd.send(sok);
-		return cmd.num;
+		return cmd.getNum();
 	}
 	
 	/**
@@ -139,11 +149,11 @@ public class JFPClient extends Thread {
 	 * @return The first received message, sent as a reply to message #{@code msgNum}, or {@code null}
 	 * 		if no such message was received during the given {@code timeout}.
 	 */
-	Message getReply(int msgNum, int timeout) {
+	public Message getReply(int msgNum, int timeout) {
 		synchronized (msgQueue) {
 			for (Iterator<Message> iter = msgQueue.iterator(); iter.hasNext();) {
 				Message msg = iter.next();
-				if (msg.replyTo == msgNum) {
+				if (msg.getReplyTo() == msgNum) {
 					iter.remove();
 					return msg;
 				}
@@ -160,7 +170,7 @@ public class JFPClient extends Thread {
 				try { msgQueue.wait(t); } catch (InterruptedException e) { } // Already in synchronized (msgQueue)
 				if (msgQueue.size() != sz) { // New message received
 					Message msg = msgQueue.get(sz);
-					if (msg.replyTo == msgNum) { // Not for us: go back to sleep
+					if (msg.getReplyTo() == msgNum) { // Not for us: go back to sleep
 						msgQueue.remove(sz);
 						return msg;
 					}
@@ -203,7 +213,7 @@ public class JFPClient extends Thread {
 				log.fine(getName()+": waiting for message...");
 				Message msg = Message.receive(sok);
 				log.fine(getName()+": received message "+msg);
-				if (msg.replyTo > 0) { // Reply message: add it to msgQueue and wakeup all RemoteInputStreams waiting for a reply
+				if (msg.getReplyTo() > 0) { // Reply message: add it to msgQueue and wakeup all RemoteInputStreams waiting for a reply
 					synchronized (msgQueue) {
 						msgQueue.add(msg);
 						msgQueue.notifyAll();
@@ -213,7 +223,7 @@ public class JFPClient extends Thread {
 				
 				// Messages spontaneously sent by the JFPFileProvider
 				if (msg instanceof MsgFile) { // Default case: file not found locally: close it remotely
-					Integer fileID = Integer.valueOf(((MsgFile)msg).fileID);
+					Integer fileID = Integer.valueOf(((MsgFile)msg).getFileID());
 					RemoteInputStream ris = remoteOpened.get(fileID);
 					if (ris == null) { // Cannot find client: send a close()
 						log.warning(getName()+": Cannot find remote opened file with ID "+fileID+", closing file... (message "+msg+")");

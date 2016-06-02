@@ -2,8 +2,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 
-import fr.jfp.JFPClient;
-import fr.jfp.JFPServer;
+import fr.jfp.client.JFPClient;
+import fr.jfp.server.JFPServer;
 
 public class Test {
 

@@ -3,6 +3,15 @@ package fr.jfp;
 import java.io.IOException;
 import java.io.InputStream;
 
+import fr.jfp.client.JFPClient;
+import fr.jfp.messages.Message;
+import fr.jfp.messages.MsgAck;
+import fr.jfp.messages.MsgClose;
+import fr.jfp.messages.MsgData;
+import fr.jfp.messages.MsgRead;
+import fr.jfp.messages.MsgSkip;
+import fr.jfp.server.JFPProvider;
+
 /**
  * An {@link InputStream} on a file served by an instance of {@link JFPProvider}.
  * 
@@ -18,17 +27,17 @@ public class RemoteInputStream extends InputStream {
 	/** The client used to transfer commands to its connected {@link JFPProvider}. */
 	private JFPClient cli;
 	
-	RemoteInputStream(String remoteFile, int fileID, JFPClient cli) {
+	public RemoteInputStream(String remoteFile, int fileID, JFPClient cli) {
 		this.remoteFile = remoteFile;
 		this.fileID = fileID;
 		this.cli = cli;
 	}
 	
-	int getFileID() {
+	public int getFileID() {
 		return fileID;
 	}
 	
-	void spontaneousMessage(Message msg) throws IOException {
+	public void spontaneousMessage(Message msg) throws IOException {
 		// TODO: Handle spontaneous close, etc.
 	}
 	
@@ -62,18 +71,19 @@ public class RemoteInputStream extends InputStream {
 		Message msg = cli.getReply(num, 0);
 		if (msg instanceof MsgAck) { // Exception occurred
 			MsgAck m = (MsgAck)msg;
-			if (m.code == MsgAck.WARN) // File not found remotely (bug?): close the file
+			if (m.getCode() == MsgAck.WARN) // File not found remotely (bug?): close the file
 				close();
 			else {
-				throw new IOException(m.msg);
+				throw new IOException(m.getMessage());
 			}
 		}
 		if (!(msg instanceof MsgData)) // Unexpected message
 			throw new IOException("Unexpected message "+msg+" ("+MsgData.class+" was expected)");
 		
 		MsgData m = (MsgData)msg;
-		System.arraycopy(m.data, 0, b, off, m.len);
-		return (m.len == 0 ? -1 : m.len);
+		int l = m.getLength();
+		System.arraycopy(m.getData(), 0, b, off, l);
+		return (l == 0 ? -1 : l);
 	}
 	
 	@Override
@@ -88,12 +98,13 @@ public class RemoteInputStream extends InputStream {
 		if (!(msg instanceof MsgAck))
 			throw new IOException("Unexpected message "+msg+" ("+MsgAck.class+" was expected)");
 		MsgAck m = (MsgAck)msg;
-		if (m.msg != null) { // Exception
-			if (m.code == MsgAck.WARN) // File not found remotely (bug?): close the file
+		String err = m.getMessage();
+		if (err != null) { // Exception
+			if (m.getCode() == MsgAck.WARN) // File not found remotely (bug?): close the file
 				close();
-			throw new IOException(m.msg);
+			throw new IOException(err);
 		}
-		return m.code;
+		return m.getCode();
     }
 	
 	@Override

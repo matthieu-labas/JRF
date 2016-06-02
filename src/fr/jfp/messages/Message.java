@@ -1,4 +1,4 @@
-package fr.jfp;
+package fr.jfp.messages;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInput;
@@ -9,6 +9,8 @@ import java.net.Socket;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.logging.Logger;
+
+import fr.jfp.ByteBufferOut;
 
 /**
  * <p>Abstract class handling sending of messages.</p>
@@ -47,10 +49,10 @@ public abstract class Message {
 	private static volatile int numCounter = 0;
 	
 	/** Message number. */
-	int num;
+	protected int num;
 	
 	/** Message number to which this message replies. */
-	int replyTo;
+	protected int replyTo;
 	
 	Message(int replyTo) {
 		this.replyTo = replyTo;
@@ -63,7 +65,12 @@ public abstract class Message {
 		this(-1);
 	}
 	
-	void initNum() {
+	public int getNum() {
+		return num;
+	}
+	
+	public int getReplyTo() {
+		return replyTo;
 	}
 	
 	/**
@@ -71,7 +78,7 @@ public abstract class Message {
 	 * @param sok The channel to send the Message.
 	 * @throws IOException
 	 */
-	void send(Socket sok) throws IOException {
+	public void send(Socket sok) throws IOException {
 		ByteBufferOut bb = encode();
 		String cls = getClass().getSimpleName();
 		int sz = MARKER.length+16+cls.length()+bb.size();
@@ -167,7 +174,7 @@ public abstract class Message {
 	 * @throws IOException when reading from the socket, or when the {@code Message} subclass could
 	 * 		not be instanciated, or when the decoding could not be performed.
 	 */
-	static Message receive(Socket sok) throws IOException {
+	public static Message receive(Socket sok) throws IOException {
 		DataInputStream dis = new DataInputStream(sok.getInputStream()); // Do NOT close this DataInputStream, as it will cascade-close the socket InputStream, cascade-closing the socket itself!
 		byte[] mrk = new byte[MARKER.length];
 		dis.readFully(mrk);

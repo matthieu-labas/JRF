@@ -2,6 +2,8 @@ package fr.jfp;
 
 import java.io.IOException;
 
+import fr.jfp.messages.Message;
+
 /**
  * <p>Interface to implement to process an "answer" message after a command has been issued on a
  * specific {@link RemoteInputStream}.</p>

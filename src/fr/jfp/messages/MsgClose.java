@@ -1,18 +1,20 @@
 /**
  * 
  */
-package fr.jfp;
+package fr.jfp.messages;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+
+import fr.jfp.ByteBufferOut;
 
 /**
  * <p>File close request.</p>
  * 
  * @author Matthieu Labas
  */
-class MsgClose extends MsgFile {
+public class MsgClose extends MsgFile {
 	
 	// Mandatory no-arg constructor
 	public MsgClose() {

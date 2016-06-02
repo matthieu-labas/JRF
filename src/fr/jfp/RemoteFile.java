@@ -2,6 +2,8 @@ package fr.jfp;
 
 import java.io.File;
 
+import fr.jfp.server.JFPServer;
+
 // TODO: URLStreamHandler?
 
 public class RemoteFile extends File {
