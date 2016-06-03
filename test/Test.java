@@ -28,15 +28,21 @@ public class Test {
 		
 		// Read remote file
 		String remf = "D:/Temp/test.txt";
-		File f = new RemoteFile(cli, remf);
-		printFileInfos(f);
-		int len = (int)f.length();
+		File fil = new RemoteFile(cli, remf);
+		printFileInfos(fil); // Print file meta-information
+		int len = (int)fil.length();
 		System.out.println("Remote "+remf+" is "+len+" bytes");
 		byte[] buf = new byte[len+1];
 		InputStream is = cli.getRemoteInputStream(remf);
 		int n = is.read(buf);
 		System.out.println("Read "+n+" bytes: "+new String(buf, 0, n));
 		is.close();
+		
+		// Get list of files
+		File[] roots = RemoteFile.listRoots(cli);
+		System.out.println("Remote roots:");
+		for (File f : roots)
+			System.out.println(String.format("%c %20.20s %s %d bytes", f.isDirectory() ? 'd' : 'f', f.getPath()+File.separator+f.getName(), new Date(f.lastModified()), f.length()));
 		
 		cli.requestStop();
 		while (cli.isAlive())

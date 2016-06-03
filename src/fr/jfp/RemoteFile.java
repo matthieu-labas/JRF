@@ -9,10 +9,12 @@ import fr.jfp.msg.file.MsgFile;
 import fr.jfp.msg.file.MsgFileIs;
 import fr.jfp.msg.file.MsgFileIs.IsType;
 import fr.jfp.msg.file.MsgFileList;
+import fr.jfp.msg.file.MsgFileRoots;
 import fr.jfp.msg.file.MsgFileSpace;
 import fr.jfp.msg.file.MsgFileSpace.SpaceType;
 import fr.jfp.msg.file.MsgReplyFileList;
 import fr.jfp.msg.file.MsgReplyFileLong;
+import fr.jfp.server.JFPProvider;
 
 public class RemoteFile extends File {
 	
@@ -21,6 +23,11 @@ public class RemoteFile extends File {
 	private String pathname;
 	private JFPClient cli;
 	
+	/**
+	 * Create a new {@link File} using {@code server} to query a remote {@link JFPProvider}.
+	 * @param server The connection to the remote {@code JFPProvider}.
+	 * @param pathname The absolute path of the <em>remote</em> file.
+	 */
 	public RemoteFile(JFPClient server, String pathname) {
 		super(pathname);
 		this.pathname = super.getAbsolutePath();
@@ -36,16 +43,27 @@ public class RemoteFile extends File {
 	}
 	
 	/**
-	 * @return The remote {@link File#listRoots() filesystem roots}.
+	 * List the roots of the remote connection.
+	 * @param server The connection to the remote {@code JFPProvider}.
+	 * @return The remote {@link File#listRoots() filesystem roots}. Each element is a {@code RemoteFile}.
 	 */
-	public RemoteFile[] listRemoteRoots() {
-		File[] roots = File.listRoots();
-		if (roots == null)
+	public static File[] listRoots(JFPClient server) {
+		int num;
+		try {
+			num = server.send(new MsgFileRoots());
+			Message msg = server.getReply(num, 0);
+			if (!(msg instanceof MsgReplyFileList))
+				throw new IOException();
+			String[] rfiles = ((MsgReplyFileList)msg).getFiles();
+			File[] files = new File[rfiles.length];
+			for (int i = 0; i < rfiles.length; i++)
+				files[i] = new RemoteFile(server, rfiles[i]);
+			return files;
+		} catch (IOException e) {
+			// TODO: Report back to 'cli' so it can close?
+			e.printStackTrace();
 			return null;
-		RemoteFile[] rroots = new RemoteFile[roots.length];
-		for (int i = 0; i < roots.length; i++)
-			rroots[i] = new RemoteFile(cli, roots[i].getAbsolutePath());
-		return rroots;
+		}
 	}
 	
 	private boolean is(MsgFile msgIs) {

@@ -30,7 +30,7 @@ public abstract class MsgFile extends Message {
 	
 	@Override
 	protected ByteBufferOut encode() throws IOException {
-		ByteBufferOut bb = new ByteBufferOut(4+2*file.length());
+		ByteBufferOut bb = new ByteBufferOut((file == null ? 4 : 4+2*file.length()));
 		bb.writeString(file);
 		return bb;
 	}
