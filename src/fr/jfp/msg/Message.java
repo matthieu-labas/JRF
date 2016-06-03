@@ -1,4 +1,4 @@
-package fr.jfp.messages;
+package fr.jfp.msg;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInput;
@@ -37,9 +37,6 @@ public abstract class Message {
 	
 	private static final Logger log = Logger.getLogger(Message.class.getName());
 	
-	/** Default package for Messages. */
-	public static final String PACKAGE = Message.class.getPackage().getName();
-	
 	/** Charset to encode {@code String}s ({@code UTF-8}). */
 	public static final Charset charset = Charset.forName("UTF-8");
 	
@@ -54,14 +51,14 @@ public abstract class Message {
 	/** Message number to which this message replies. */
 	protected int replyTo;
 	
-	Message(int replyTo) {
+	protected Message(int replyTo) {
 		this.replyTo = replyTo;
 		synchronized (Message.class) {
 			num = ++numCounter;
 		}
 	}
 	
-	Message() {
+	protected Message() {
 		this(-1);
 	}
 	
@@ -71,32 +68,6 @@ public abstract class Message {
 	
 	public int getReplyTo() {
 		return replyTo;
-	}
-	
-	/**
-	 * Send the Message on the {@code SocketChannel}.
-	 * @param sok The channel to send the Message.
-	 * @throws IOException
-	 */
-	public void send(Socket sok) throws IOException {
-		ByteBufferOut bb = encode();
-		String cls = getClass().getSimpleName();
-		int sz = MARKER.length+16+cls.length()+bb.size();
-		try (ByteBufferOut data = new ByteBufferOut(sz)) {
-			data.write(MARKER); // Marker
-			data.writeInt(num); // Message number
-			data.writeInt(replyTo); // Reply to
-			data.writeString(cls); // Type
-			data.writeInt(bb.size()); // Body size
-			data.write(bb.getRawArray(), 0, bb.size()); // Body
-			byte[] buf = data.getRawArray();
-			int len = data.size();
-			log.info(Thread.currentThread().getName()+" sending message "+this+" ("+bb.size()+" body bytes)");
-			log.finest(Thread.currentThread().getName()+"\t"+debug(buf, len));
-			sok.getOutputStream().write(buf, 0, len);
-		} finally {
-			bb.close();
-		}
 	}
 	
 	private static String debug(byte[] buf, int len) {
@@ -165,6 +136,32 @@ public abstract class Message {
 	}
 	
 	/**
+	 * Send the Message on the {@code SocketChannel}.
+	 * @param sok The channel to send the Message.
+	 * @throws IOException
+	 */
+	public void send(Socket sok) throws IOException {
+		ByteBufferOut bb = encode();
+		String cls = getClass().getName();
+		int sz = MARKER.length+16+cls.length()+bb.size();
+		try (ByteBufferOut data = new ByteBufferOut(sz)) {
+			data.write(MARKER); // Marker
+			data.writeInt(num); // Message number
+			data.writeInt(replyTo); // Reply to
+			data.writeString(cls); // Type
+			data.writeInt(bb.size()); // Body size
+			data.write(bb.getRawArray(), 0, bb.size()); // Body
+			byte[] buf = data.getRawArray();
+			int len = data.size();
+			log.info(Thread.currentThread().getName()+" sending message "+this+" ("+bb.size()+" body bytes)");
+			log.finest(Thread.currentThread().getName()+"\t"+debug(buf, len));
+			sok.getOutputStream().write(buf, 0, len);
+		} finally {
+			bb.close();
+		}
+	}
+	
+	/**
 	 * Receive and decode a message by reading a {@code Socket}. The appropriate {@code Message}
 	 * subclass is instanciated by reflection, using the nullary constructor of the decoded class
 	 * name. If the class cannot be found in the classpath or no nullary constructor exists, an
@@ -184,7 +181,7 @@ public abstract class Message {
 		
 		int num = dis.readInt();
 		int replyTo = dis.readInt();
-		String clsName = PACKAGE+"."+readString(dis);
+		String clsName = readString(dis);
 		Message msg;
 		Class<?> cls;
 		try {

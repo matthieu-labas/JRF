@@ -5,7 +5,7 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import fr.jfp.messages.Message;
+import fr.jfp.msg.Message;
 
 /**
  * <p>Convenience class to use as a byte buffer to serialize objects before writing them to a Socket.</p>

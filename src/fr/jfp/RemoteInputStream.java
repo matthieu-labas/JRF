@@ -4,12 +4,12 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import fr.jfp.client.JFPClient;
-import fr.jfp.messages.Message;
-import fr.jfp.messages.MsgAck;
-import fr.jfp.messages.MsgClose;
-import fr.jfp.messages.MsgData;
-import fr.jfp.messages.MsgRead;
-import fr.jfp.messages.MsgSkip;
+import fr.jfp.msg.Message;
+import fr.jfp.msg.MsgAck;
+import fr.jfp.msg.MsgClose;
+import fr.jfp.msg.MsgData;
+import fr.jfp.msg.MsgRead;
+import fr.jfp.msg.MsgSkip;
 import fr.jfp.server.JFPProvider;
 
 /**
@@ -17,6 +17,7 @@ import fr.jfp.server.JFPProvider;
  * 
  * @author Matthieu Labas
  */
+// TODO: Protocol handler? Change package to java.protocol.handler.pkgs.jfp. See http://stackoverflow.com/a/26409796/1098603
 public class RemoteInputStream extends InputStream {
 	
 	/** The remote absolute path to the file. */
@@ -61,7 +62,7 @@ public class RemoteInputStream extends InputStream {
 	}
 	
 	@Override
-    public int read(final byte b[], final int off, final int len) throws IOException {
+    public int read(final byte b[], final int off, final int len) throws IOException { // TODO: Use UDP to get data back?
 		if (cli == null)
 			throw new IOException("Closed");
 		

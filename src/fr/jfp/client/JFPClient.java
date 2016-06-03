@@ -15,11 +15,11 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import fr.jfp.RemoteInputStream;
-import fr.jfp.messages.Message;
-import fr.jfp.messages.MsgAck;
-import fr.jfp.messages.MsgClose;
-import fr.jfp.messages.MsgFile;
-import fr.jfp.messages.MsgOpen;
+import fr.jfp.msg.Message;
+import fr.jfp.msg.MsgAck;
+import fr.jfp.msg.MsgClose;
+import fr.jfp.msg.MsgFileCmd;
+import fr.jfp.msg.MsgOpen;
 import fr.jfp.server.JFPProvider;
 
 /**
@@ -222,8 +222,8 @@ public class JFPClient extends Thread {
 				}
 				
 				// Messages spontaneously sent by the JFPFileProvider
-				if (msg instanceof MsgFile) { // Default case: file not found locally: close it remotely
-					Integer fileID = Integer.valueOf(((MsgFile)msg).getFileID());
+				if (msg instanceof MsgFileCmd) { // Default case: file not found locally: close it remotely
+					Integer fileID = Integer.valueOf(((MsgFileCmd)msg).getFileID());
 					RemoteInputStream ris = remoteOpened.get(fileID);
 					if (ris == null) { // Cannot find client: send a close()
 						log.warning(getName()+": Cannot find remote opened file with ID "+fileID+", closing file... (message "+msg+")");

@@ -1,7 +1,7 @@
 /**
  * 
  */
-package fr.jfp.messages;
+package fr.jfp.msg;
 
 /**
  * <p>Abstract class denoting a file operation. Used to retrieve the associated file ID.
@@ -9,17 +9,17 @@ package fr.jfp.messages;
  * 
  * @author Matthieu Labas
  */
-public abstract class MsgFile extends Message {
+public abstract class MsgFileCmd extends Message {
 	
 	/** The file ID to close. */
 	protected int fileID;
 	
-	public MsgFile(int replyTo, int fileID) {
+	public MsgFileCmd(int replyTo, int fileID) {
 		super(replyTo);
 		this.fileID = fileID;
 	}
 	
-	public MsgFile(int fileID) {
+	public MsgFileCmd(int fileID) {
 		this(-1, fileID);
 	}
 	

@@ -1,6 +1,5 @@
 package fr.jfp.server;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -10,8 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
-
-import fr.jfp.RemoteFile;
 
 /**
  * Class listening for connections on a {@code ServerSocket} and creating {@link JFPProvider} instances
@@ -82,18 +79,6 @@ public class JFPServer extends Thread {
 		}
 	}
 	
-	/**
-	 * @return The {@link File#listRoots() filesystem roots} of the Server.
-	 */
-	public RemoteFile[] listRoots() {
-		File[] roots = File.listRoots();
-		if (roots == null)
-			return null;
-		RemoteFile[] rroots = new RemoteFile[roots.length];
-		for (int i = 0; i < roots.length; i++)
-			rroots[i] = new RemoteFile(this, roots[i].getAbsolutePath());
-		return rroots;
-	}
 	
 	
 	public static void main(String[] args) throws NumberFormatException, IOException {

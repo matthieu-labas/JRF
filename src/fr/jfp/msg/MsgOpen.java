@@ -1,4 +1,4 @@
-package fr.jfp.messages;
+package fr.jfp.msg;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;

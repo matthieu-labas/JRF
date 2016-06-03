@@ -1,4 +1,4 @@
-package fr.jfp.messages;
+package fr.jfp.msg;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -10,7 +10,7 @@ import java.util.zip.Inflater;
 import fr.jfp.ByteBufferOut;
 import fr.jfp.ByteBufferOut.StraightByteArrayOutputStream;
 
-public class MsgData extends MsgFile {
+public class MsgData extends MsgFileCmd {
 	
 	/** <p>The chunk data.</p>
 	 * <p>When the message is <em>sent</em>, the content is the original data when no compression

@@ -1,7 +1,4 @@
-/**
- * 
- */
-package fr.jfp.messages;
+package fr.jfp.msg;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -9,26 +6,30 @@ import java.io.IOException;
 
 import fr.jfp.ByteBufferOut;
 
-/**
- * <p>File close request.</p>
- * 
- * @author Matthieu Labas
- */
-public class MsgClose extends MsgFile {
+public class MsgRead extends MsgFileCmd {
+	
+	/** The number of bytes to read. */
+	protected int len;
 	
 	// Mandatory no-arg constructor
-	public MsgClose() {
+	public MsgRead() {
 		super(-1);
 	}
 	
-	public MsgClose(int fileID) {
+	public MsgRead(int fileID, int len) {
 		super(fileID);
+		this.len = len;
+	}
+	
+	public int getLength() {
+		return len;
 	}
 	
 	@Override
 	protected ByteBufferOut encode() throws IOException {
 		ByteBufferOut bb = new ByteBufferOut(4);
 		bb.writeInt(fileID);
+		bb.writeInt(len);
 		return bb;
 	}
 	
@@ -36,12 +37,13 @@ public class MsgClose extends MsgFile {
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
 			fileID = dis.readInt();
+			len = dis.readInt();
 		}
 	}
 	
 	@Override
 	public String toString() {
-		return stdToString()+" file "+fileID;
+		return stdToString()+" "+len+" bytes on file "+fileID;
 	}
 	
 }

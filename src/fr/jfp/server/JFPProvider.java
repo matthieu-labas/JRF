@@ -17,13 +17,19 @@ import java.util.logging.Logger;
 
 import fr.jfp.RemoteInputStream;
 import fr.jfp.client.JFPClient;
-import fr.jfp.messages.Message;
-import fr.jfp.messages.MsgAck;
-import fr.jfp.messages.MsgClose;
-import fr.jfp.messages.MsgData;
-import fr.jfp.messages.MsgOpen;
-import fr.jfp.messages.MsgRead;
-import fr.jfp.messages.MsgSkip;
+import fr.jfp.msg.Message;
+import fr.jfp.msg.MsgAck;
+import fr.jfp.msg.MsgClose;
+import fr.jfp.msg.MsgData;
+import fr.jfp.msg.MsgOpen;
+import fr.jfp.msg.MsgRead;
+import fr.jfp.msg.MsgSkip;
+import fr.jfp.msg.file.MsgFile;
+import fr.jfp.msg.file.MsgFileIs;
+import fr.jfp.msg.file.MsgFileList;
+import fr.jfp.msg.file.MsgFileSpace;
+import fr.jfp.msg.file.MsgReplyFileList;
+import fr.jfp.msg.file.MsgReplyFileLong;
 
 /**
  * <p>The JFP Provider is the {@link JFPClient} Server counterpart, receiving file commands.</p>
@@ -199,6 +205,36 @@ public class JFPProvider extends Thread {
 		}
 	}
 	
+	private void handleFileOp(MsgFile msg) throws IOException {
+		log.info(getName()+": Request FileOp "+msg);
+		if (msg instanceof MsgFileIs) {
+			MsgFileIs m = (MsgFileIs)msg;
+			boolean is = false;
+			switch (m.isType()) {
+				case IS_EXIST: is = m.getFile().exists(); break;
+				case IS_FILE: is = m.getFile().isFile(); break;
+				case IS_DIRECTORY: is = m.getFile().isDirectory(); break;
+			}
+			new MsgReplyFileLong(m.getNum(), is ? 1l : 0l).send(sok);
+		} else if (msg instanceof MsgFileSpace) {
+			MsgFileSpace m = (MsgFileSpace)msg;
+			long val = 0l;
+			switch (m.spaceType()) {
+				case LENGTH: val = m.getFile().length(); break;
+				case FREE_SPACE: val = m.getFile().getFreeSpace(); break;
+				case LAST_MODIFIED: val = m.getFile().lastModified(); break;
+				case TOTAL_SPACE: val = m.getFile().getTotalSpace(); break;
+				case USABLE_SPACE: val = m.getFile().getUsableSpace(); break;
+			}
+			new MsgReplyFileLong(m.getNum(), val).send(sok);
+		} else if (msg instanceof MsgFileList) {
+			MsgFileList m = (MsgFileList)msg;
+			new MsgReplyFileList(m.getNum(), m.getFile().list()).send(sok);
+		} else {
+			log.warning(getName()+": Unhandled FileOp message "+msg);
+		}
+	}
+	
 	@Override
 	public void run() {
 		while (goOn) {
@@ -216,6 +252,8 @@ public class JFPProvider extends Thread {
 					handleSkip((MsgSkip)msg);
 				} else if (msg instanceof MsgClose) { // Close file: no reply
 					handleClose((MsgClose)msg);
+				} else if (msg instanceof MsgFile) { // Operation on java.io.File
+					handleFileOp((MsgFile)msg);
 				} else { // Unknown
 					log.warning(getName()+": Don't know how to handle file message "+msg);
 				}

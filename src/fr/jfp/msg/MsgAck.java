@@ -1,9 +1,8 @@
-package fr.jfp.messages;
+package fr.jfp.msg;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 import fr.jfp.ByteBufferOut;
 
@@ -13,7 +12,7 @@ import fr.jfp.ByteBufferOut;
  * 
  * @author Matthieu Labas
  */
-public class MsgAck extends MsgFile {
+public class MsgAck extends MsgFileCmd {
 	
 	// Ack codes constants
 	
@@ -25,7 +24,7 @@ public class MsgAck extends MsgFile {
 	public static final int ERR = 2;
 	
 	/** Return code. */
-	protected int code;
+	protected long code;
 	
 	/** An optional error message, in case of an exception being thrown (when {@link #code} is
 	 * {@link #WARN} or {@link #ERR}). {@code null} if not present. */
@@ -36,7 +35,7 @@ public class MsgAck extends MsgFile {
 		super(-1);
 	}
 	
-	public MsgAck(int replyTo, int fileID, int code, String msg) {
+	public MsgAck(int replyTo, int fileID, long code, String msg) {
 		super(fileID);
 		this.replyTo = replyTo;
 		this.code = code;
@@ -47,29 +46,16 @@ public class MsgAck extends MsgFile {
 		this(replyTo, fileID, OK);
 	}
 	
-	MsgAck(int replyTo, int fileID, int code) {
+	MsgAck(int replyTo, int fileID, long code) {
 		this(replyTo, fileID, code, null);
 	}
 	
-	public int getCode() {
+	public long getCode() {
 		return code;
 	}
 	
 	public String getMessage() {
 		return msg;
-	}
-	
-	public static ByteBuffer encode(int idFichier, int code, String msg) {
-		byte[] _msg = null;
-		if (msg != null)
-			_msg = msg.getBytes(charset);
-		ByteBuffer bb = ByteBuffer.allocate(12 + (_msg == null ? 0 : _msg.length));
-		bb.putInt(idFichier);
-		bb.putInt(code);
-		bb.putInt(_msg == null ? -1 : _msg.length);
-		if (_msg.length > 0)
-			bb.put(_msg, 0, _msg.length);
-		return bb;
 	}
 	
 	@Override
@@ -79,7 +65,7 @@ public class MsgAck extends MsgFile {
 			_msg = msg.getBytes(charset);
 		ByteBufferOut bb = new ByteBufferOut(12+(_msg == null ? 0 : _msg.length));
 		bb.writeInt(fileID);
-		bb.writeInt(code);
+		bb.writeLong(code);
 		if (_msg == null)
 			bb.writeInt(-1);
 		else {
@@ -94,7 +80,7 @@ public class MsgAck extends MsgFile {
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
 			fileID = dis.readInt();
-			code = dis.readInt();
+			code = dis.readLong();
 			int n = dis.readInt();
 			if (n < 0)
 				msg = null;
