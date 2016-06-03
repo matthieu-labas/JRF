@@ -68,6 +68,7 @@ public class RemoteInputStream extends InputStream {
 		
 		if (len == 0)
 			return 0;
+		// No latency computing for read messages because the received size can be too big and bandwidth would further pollute the measurement
 		int num = cli.send(new MsgRead(fileID, len));
 		Message msg = cli.getReply(num, 0);
 		if (msg instanceof MsgAck) { // Exception occurred
@@ -94,8 +95,10 @@ public class RemoteInputStream extends InputStream {
 		
 		if (len == 0)
 			return 0;
+		long t0 = System.nanoTime();
 		int num = cli.send(new MsgSkip(fileID, len));
 		Message msg = cli.getReply(num, 0);
+		cli.addLatencyNow(t0);
 		if (!(msg instanceof MsgAck))
 			throw new IOException("Unexpected message "+msg+" ("+MsgAck.class+" was expected)");
 		MsgAck m = (MsgAck)msg;

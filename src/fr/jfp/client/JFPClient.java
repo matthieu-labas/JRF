@@ -40,6 +40,11 @@ public class JFPClient extends Thread {
 	 * for a reply message to their command message. */
 	private List<Message> msgQueue;
 	
+	/** Latency accumulator, in µs. Average latency is {@code totLatency / nLatency}. */
+	private long totLatency;
+	/** Latency counter. */
+	private int nLatency;
+	
 	private volatile boolean goOn;
 	
 	JFPClient(Socket sok) {
@@ -52,11 +57,45 @@ public class JFPClient extends Thread {
 		this.sok = sok;
 		remoteOpened = new HashMap<>();
 		msgQueue = new ArrayList<Message>();
+		totLatency = 0;
+		nLatency = 0;
 		goOn = true;
 	}
 	
 	public JFPClient(InetSocketAddress addr) throws IOException {
 		this(new Socket(addr.getAddress(), addr.getPort()));
+	}
+	
+	/**
+	 * Add a latency for a command/reply. {@code t0} is in ns and is expected to be the
+	 * {@link System#nanoTime()} before the {@code send()} command was issued:
+	 * <pre>
+	 * long t0 = System.nanoTime();
+	 * int num = jfpClient.send(msgOut); // Latency also includes serialization and socket send time
+	 * Message reply = jfpClient.getReply(num); // Latency also includes network receive, deserialization and synchronization time
+	 * jfpClient.addLatencyNow(t0);
+	 * </pre>
+	 * That value is not a precise network latency because it also include the time taken receiving
+	 * a message (bandwidth) and thread synchronization delays. Therefore, it should be used on
+	 * "control" messages only, when the expected command/reply message are small in size and processing.
+	 * @param t0 The latency to add, in µs.
+	 */
+	public synchronized void addLatencyNow(long t0) {
+		totLatency += (System.nanoTime() - t0) / 1000;
+		nLatency++;
+	}
+	
+	/**
+	 * @return The average latency (time between command send timestamp and answer timestamp).
+	 */
+	public synchronized  double getLatency() {
+		return (double)totLatency / nLatency;
+	}
+	
+	/** Reset the latency counters to start new measurements. */
+	public synchronized void resetLatencyCounters() {
+		totLatency = 0;
+		nLatency = 0;
 	}
 	
 	/**
@@ -97,9 +136,10 @@ public class JFPClient extends Thread {
 	 * @throws IOException If a network error occurs.
 	 */
 	public InputStream getRemoteInputStream(String remoteFile) throws IOException {
-		MsgOpen mo = new MsgOpen(remoteFile, 0);
-		mo.send(sok); // Remote open file
-		Message m = getReply(mo.getNum(), 0); // Wait for MsgAck to get file ID
+		long t0 = System.nanoTime();
+		int num = new MsgOpen(remoteFile, 0).send(sok); // Remote open file
+		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
+		addLatencyNow(t0);
 		if (m instanceof MsgAck) {
 			MsgAck msg = (MsgAck)m;
 			String err = msg.getMessage();

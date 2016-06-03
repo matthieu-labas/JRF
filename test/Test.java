@@ -47,7 +47,7 @@ public class Test {
 		cli.requestStop();
 		while (cli.isAlive())
 			try{Thread.sleep(200);}catch(InterruptedException e){}
-		System.out.println("The end.");
+		System.out.println("The end. Average latency "+cli.getLatency()+" µs");
 	}
 
 }

@@ -138,9 +138,10 @@ public abstract class Message {
 	/**
 	 * Send the Message on the {@code SocketChannel}.
 	 * @param sok The channel to send the Message.
+	 * @return The message number.
 	 * @throws IOException
 	 */
-	public void send(Socket sok) throws IOException {
+	public int send(Socket sok) throws IOException {
 		ByteBufferOut bb = encode();
 		String cls = getClass().getName();
 		int sz = MARKER.length+16+cls.length()+bb.size();
@@ -156,6 +157,7 @@ public abstract class Message {
 			log.info(Thread.currentThread().getName()+" sending message "+this+" ("+bb.size()+" body bytes)");
 			log.finest(Thread.currentThread().getName()+"\t"+debug(buf, len));
 			sok.getOutputStream().write(buf, 0, len);
+			return num;
 		} finally {
 			bb.close();
 		}

@@ -50,8 +50,10 @@ public class RemoteFile extends File {
 	public static File[] listRoots(JFPClient server) {
 		int num;
 		try {
+			long t0 = System.nanoTime();
 			num = server.send(new MsgFileRoots());
 			Message msg = server.getReply(num, 0);
+			server.addLatencyNow(t0);
 			if (!(msg instanceof MsgReplyFileList))
 				throw new IOException();
 			String[] rfiles = ((MsgReplyFileList)msg).getFiles();
@@ -69,8 +71,10 @@ public class RemoteFile extends File {
 	private boolean is(MsgFile msgIs) {
 		int num;
 		try {
+			long t0 = System.nanoTime();
 			num = cli.send(msgIs);
 			Message msg = cli.getReply(num, 0);
+			cli.addLatencyNow(t0);
 			if (!(msg instanceof MsgReplyFileLong))
 				throw new IOException();
 			return (((MsgReplyFileLong)msg).getValue() != 0);
@@ -99,8 +103,10 @@ public class RemoteFile extends File {
 	private long getLong(Message msgLong) {
 		int num;
 		try {
+			long t0 = System.nanoTime();
 			num = cli.send(msgLong);
 			Message msg = cli.getReply(num, 0);
+			cli.addLatencyNow(t0);
 			if (!(msg instanceof MsgReplyFileLong))
 				throw new IOException();
 			return ((MsgReplyFileLong)msg).getValue();
@@ -140,6 +146,7 @@ public class RemoteFile extends File {
 	public String[] list() {
 		int num;
 		try {
+			// No latency calculation for file list because the received message can be big
 			num = cli.send(new MsgFileList(pathname));
 			Message msg = cli.getReply(num, 0);
 			if (!(msg instanceof MsgReplyFileList))
