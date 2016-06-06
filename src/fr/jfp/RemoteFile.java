@@ -48,7 +48,7 @@ public class RemoteFile extends File {
 	 * @return The remote {@link File#listRoots() filesystem roots}. Each element is a {@code RemoteFile}.
 	 */
 	public static File[] listRoots(JFPClient server) {
-		int num;
+		short num;
 		try {
 			long t0 = System.nanoTime();
 			num = server.send(new MsgFileRoots());
@@ -69,7 +69,7 @@ public class RemoteFile extends File {
 	}
 	
 	private boolean is(MsgFile msgIs) {
-		int num;
+		short num;
 		try {
 			long t0 = System.nanoTime();
 			num = cli.send(msgIs);
@@ -101,7 +101,7 @@ public class RemoteFile extends File {
 	}
 	
 	private long getLong(Message msgLong) {
-		int num;
+		short num;
 		try {
 			long t0 = System.nanoTime();
 			num = cli.send(msgLong);
@@ -144,7 +144,7 @@ public class RemoteFile extends File {
 	
 	@Override
 	public String[] list() {
-		int num;
+		short num;
 		try {
 			// No latency calculation for file list because the received message can be big
 			num = cli.send(new MsgFileList(pathname));

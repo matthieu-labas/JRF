@@ -140,20 +140,21 @@ public abstract class Message {
 	 * @return The message number.
 	 * @throws IOException
 	 */
-	public int send(Socket sok) throws IOException {
+	public short send(Socket sok) throws IOException {
 		ByteBufferOut bb = encode();
+		int szEnc = bb.size();
 		String cls = getClass().getName();
-		int sz = MARKER.length+16+cls.length()+bb.size();
+		int sz = MARKER.length+10+cls.length()+szEnc;
 		try (ByteBufferOut data = new ByteBufferOut(sz)) {
 			data.write(MARKER); // Marker
 			data.writeShort(num); // Message number
 			data.writeShort(replyTo); // Reply to
 			data.writeString(cls); // Type
-			data.writeInt(bb.size()); // Body size
-			data.write(bb.getRawArray(), 0, bb.size()); // Body
+			data.writeInt(szEnc); // Body size
+			data.write(bb.getRawArray(), 0, szEnc); // Body
 			byte[] buf = data.getRawArray();
 			int len = data.size();
-			log.info(Thread.currentThread().getName()+" sending message "+this+" ("+bb.size()+" body bytes)");
+			log.info(Thread.currentThread().getName()+" sending message "+this+" ("+szEnc+" body bytes)");
 			log.finest(Thread.currentThread().getName()+"\t"+debug(buf, len));
 			sok.getOutputStream().write(buf, 0, len);
 			return num;

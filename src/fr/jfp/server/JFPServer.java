@@ -1,6 +1,7 @@
 package fr.jfp.server;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -20,15 +21,16 @@ public class JFPServer extends Thread {
 	
 	private static final Logger log = Logger.getLogger(JFPServer.class.getName());
 	
-	private static final Map<Integer,JFPServer> instances = new HashMap<>(4);
+	public static final int DEFAULT_PORT = 2205;
 	
-	public static JFPServer get(int port) throws IOException {
-		Integer p = Integer.valueOf(port);
+	private static final Map<InetSocketAddress,JFPServer> instances = new HashMap<>(4);
+	
+	public static JFPServer get(InetSocketAddress addr) throws IOException {
 		synchronized (instances) {
-			JFPServer fp = instances.get(p);
+			JFPServer fp = instances.get(addr);
 			if (fp == null) {
-				fp = new JFPServer(port);
-				instances.put(p, fp);
+				fp = new JFPServer(addr);
+				instances.put(addr, fp);
 			}
 			return fp;
 		}
@@ -40,8 +42,9 @@ public class JFPServer extends Thread {
 	
 	private List<JFPProvider> clients;
 	
-	private JFPServer(int port) throws IOException {
-		srv = new ServerSocket(port);
+	private JFPServer(InetSocketAddress addr) throws IOException {
+		srv = new ServerSocket();
+		srv.bind(addr);
 		clients = new ArrayList<>();
 		setName(JFPServer.class.getSimpleName()+" on *:"+srv.getLocalPort());
 		goOn = true;
@@ -81,8 +84,37 @@ public class JFPServer extends Thread {
 	
 	
 	
+	public static void usage() {
+		System.out.println("Options: <hostname[:port]>");
+		System.out.println("If <port> is not specified, 2205 will be used.");
+	}
+	
 	public static void main(String[] args) throws NumberFormatException, IOException {
-		JFPServer.get(Integer.parseInt(args[0])).start(); // TODO
+		String[] hp = null;
+		int port = DEFAULT_PORT;
+		
+		switch (args.length) {
+			case 0: break;
+			
+			case 1:
+				hp = args[0].split(":");
+				if (hp.length > 1) {
+					try {
+						port = Integer.parseInt(hp[1]);
+					} catch (NumberFormatException e) {
+						System.err.println("Cannot parse port '"+hp[1]+"'");
+						System.exit(2);
+					}
+				}
+				break;
+			
+			default:
+				usage();
+				System.exit(1);
+				break;
+		}
+		InetSocketAddress addr = hp == null || hp[0].isEmpty() ? new InetSocketAddress(port) : new InetSocketAddress(hp[0], port);
+		JFPServer.get(addr).start();
 	}
 	
 }

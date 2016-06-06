@@ -144,7 +144,7 @@ public class JFPClient extends Thread {
 	 */
 	public InputStream getRemoteInputStream(String remoteFile) throws IOException {
 		long t0 = System.nanoTime();
-		int num = new MsgOpen(remoteFile, 0).send(sok); // Remote open file
+		short num = new MsgOpen(remoteFile, 0).send(sok); // Remote open file
 		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
 		addLatencyNow(t0);
 		if (m instanceof MsgAck) {
@@ -172,7 +172,7 @@ public class JFPClient extends Thread {
 	 * @return The message number {@code cmd.num}.
 	 * @throws IOException on error while sending.
 	 */
-	public int send(Message cmd) throws IOException {
+	public short send(Message cmd) throws IOException {
 		cmd.send(sok);
 		return cmd.getNum();
 	}
@@ -196,7 +196,7 @@ public class JFPClient extends Thread {
 	 * @return The first received message, sent as a reply to message #{@code msgNum}, or {@code null}
 	 * 		if no such message was received during the given {@code timeout}.
 	 */
-	public Message getReply(int msgNum, int timeout) {
+	public Message getReply(short msgNum, int timeout) {
 		synchronized (msgQueue) {
 			for (Iterator<Message> iter = msgQueue.iterator(); iter.hasNext();) {
 				Message msg = iter.next();

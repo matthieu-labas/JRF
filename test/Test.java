@@ -23,9 +23,9 @@ public class Test {
 	}
 	
 	public static void test() throws IOException {
-		JFPServer srv = JFPServer.get(2205);
+		JFPServer srv = JFPServer.get(new InetSocketAddress(JFPServer.DEFAULT_PORT));
 		srv.start();
-		JFPClient cli = new JFPClient(new InetSocketAddress("127.0.0.1", 2205));
+		JFPClient cli = new JFPClient(new InetSocketAddress("127.0.0.1", JFPServer.DEFAULT_PORT));
 		System.out.println("Connected.");
 		srv.requestStop();
 		cli.start();
