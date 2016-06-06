@@ -10,7 +10,9 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -49,7 +51,7 @@ public class JFPProvider extends Thread {
 	private Socket sok;
 	
 	/** Map of locally open files. Key is the file ID. */
-	private Map<Short,InputStream> localOpened;
+	private Map<Short,NamedFileInputStream> localOpened;
 	
 	private volatile boolean goOn;
 	
@@ -73,6 +75,24 @@ public class JFPProvider extends Thread {
 		this.sok = sok;
 		localOpened = new HashMap<>();
 		goOn = true;
+	}
+	
+	/**
+	 * @return The address of the connected {@link JFPClient}.
+	 */
+	public InetSocketAddress getRemote() {
+		return (InetSocketAddress)sok.getRemoteSocketAddress();
+	}
+	
+	/**
+	 * @return The list of currently opened files.
+	 */
+	public List<String> getOpenedFiles() {
+		// Could be synchronized...
+		List<String> opnd = new ArrayList<>(localOpened.size());
+		for (NamedFileInputStream is : localOpened.values())
+			opnd.add(is.name);
+		return opnd;
 	}
 	
 	/**
@@ -109,7 +129,7 @@ public class JFPProvider extends Thread {
 		log.info(getName()+": Request open file "+file);
 		MsgAck ack;
 		try {
-			InputStream is = new FileInputStream(file);
+			NamedFileInputStream is = new NamedFileInputStream(file);
 			ack = new MsgAck(num, (short)(fileCounter.incrementAndGet() & 0xffff));
 			log.fine(getName()+": "+file+" > ID "+ack.getFileID());
 			localOpened.put(ack.getFileID(), is);
@@ -288,4 +308,12 @@ public class JFPProvider extends Thread {
 		log.info(getName()+": Closed.");
 	}
 	
+	
+	
+	private static class NamedFileInputStream extends FileInputStream {
+		private String name;
+		public NamedFileInputStream(String name) throws FileNotFoundException {
+			super(name);
+		}
+	}
 }

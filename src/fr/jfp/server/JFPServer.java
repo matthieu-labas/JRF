@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.logging.Logger;
 
 /**
@@ -36,6 +37,12 @@ public class JFPServer extends Thread {
 		}
 	}
 	
+	public static List<JFPServer> getServers() {
+		synchronized (instances) {
+			return new ArrayList<>(instances.values());
+		}
+	}
+	
 	private ServerSocket srv;
 	
 	private boolean goOn;
@@ -48,6 +55,20 @@ public class JFPServer extends Thread {
 		clients = new ArrayList<>();
 		setName(JFPServer.class.getSimpleName()+" on *:"+srv.getLocalPort());
 		goOn = true;
+	}
+	
+	/**
+	 * @return The address the JFP Server is bound to.
+	 */
+	public InetSocketAddress getAddress() {
+		return (InetSocketAddress)srv.getLocalSocketAddress();
+	}
+	
+	/**
+	 * @return The list of JFP Providers currently connected to the JFP Server.
+	 */
+	public List<JFPProvider> getClients() {
+		return new ArrayList<>(clients);
 	}
 	
 	public void requestStop() {
@@ -114,7 +135,59 @@ public class JFPServer extends Thread {
 				break;
 		}
 		InetSocketAddress addr = hp == null || hp[0].isEmpty() ? new InetSocketAddress(port) : new InetSocketAddress(hp[0], port);
-		JFPServer.get(addr).start();
+		final JFPServer srv = JFPServer.get(addr);
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				srv.requestStop();
+				while (srv.isAlive())
+					try{srv.join();}catch(InterruptedException e){}
+			}
+		});
+		srv.start();
+		
+		System.out.println(srv.getName());
+		Scanner sc = new Scanner(System.in);
+		while (srv.isAlive()) {
+			System.out.print("$ ");
+			String c = sc.next();
+			switch (c) {
+				case "q":
+				case "Q":
+				case "x":
+				case "X":
+					System.out.print("\nDo you want to exit (y/N)? ");
+					c = sc.next();
+					if ("y".equalsIgnoreCase(c)) {
+						srv.requestStop();
+						while (srv.isAlive())
+							try{srv.join();}catch(InterruptedException e){}
+					}
+					break;
+				
+				case "?":
+					if (srv.clients.isEmpty()) {
+						System.out.println("No client connected.");
+						break;
+					}
+					System.out.println(srv.clients.size()+" client(s) connected:");
+					for (JFPProvider prov : srv.clients) {
+						System.out.println(prov.getRemote());
+						for (String fi : prov.getOpenedFiles())
+							System.out.println("    "+fi);
+					}
+					break;
+				
+				default:
+					System.out.println("Commands:");
+					System.out.println("X - Exit");
+					System.out.println("Q - Exit");
+					System.out.println("? - Show connected clients and opened files");
+					break;
+			}
+		}
+		sc.close();
+		System.out.println("Bye.");
 	}
 	
 }
