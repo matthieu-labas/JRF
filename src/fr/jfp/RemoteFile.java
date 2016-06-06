@@ -6,12 +6,14 @@ import java.io.IOException;
 import fr.jfp.client.JFPClient;
 import fr.jfp.msg.Message;
 import fr.jfp.msg.file.MsgFile;
+import fr.jfp.msg.file.MsgFileInfos;
 import fr.jfp.msg.file.MsgFileIs;
 import fr.jfp.msg.file.MsgFileIs.IsType;
 import fr.jfp.msg.file.MsgFileList;
 import fr.jfp.msg.file.MsgFileRoots;
 import fr.jfp.msg.file.MsgFileSpace;
 import fr.jfp.msg.file.MsgFileSpace.SpaceType;
+import fr.jfp.msg.file.MsgReplyFileInfos;
 import fr.jfp.msg.file.MsgReplyFileList;
 import fr.jfp.msg.file.MsgReplyFileLong;
 import fr.jfp.server.JFPProvider;
@@ -168,6 +170,20 @@ public class RemoteFile extends File {
 		for (int i = 0; i < files.length; i++)
 			rfs[i] = new RemoteFile(cli, files[i]);
 		return rfs;
+	}
+	
+	/**
+	 * @return All remote file information (length, last modified date, attributes).
+	 * @throws IOException When the communication cannot be performed with the JFP provider.
+	 */
+	public MsgReplyFileInfos getFileInfos() throws IOException {
+		long t0 = System.nanoTime();
+		short num = cli.send(new MsgFileInfos(pathname));
+		Message msg = cli.getReply(num, 0);
+		cli.addLatencyNow(t0);
+		if (!(msg instanceof MsgReplyFileInfos))
+			throw new IOException();
+		return (MsgReplyFileInfos)msg;
 	}
 	
 }

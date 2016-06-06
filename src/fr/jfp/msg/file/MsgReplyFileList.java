@@ -23,12 +23,13 @@ public class MsgReplyFileList extends Message {
 	
 	// Mandatory no-arg constructor
 	public MsgReplyFileList() {
-		this((short)-1, null);
+		this((short)-1, null, false);
 	}
 	
-	public MsgReplyFileList(short replyTo, String[] files) {
+	public MsgReplyFileList(short replyTo, String[] files, boolean last) {
 		super(replyTo);
 		this.files = files;
+		this.last = last;
 	}
 	
 	public boolean isLast() {
@@ -49,7 +50,7 @@ public class MsgReplyFileList extends Message {
 		for (String f : files)
 			n += 2*f.length();
 		ByteBufferOut bb = new ByteBufferOut(n);
-		bb.writeBoolean(last);
+		bb.writeByte(last ? 0 : 1);
 		bb.writeInt(files.length);
 		for (String f : files)
 			bb.writeString(f);
@@ -59,7 +60,7 @@ public class MsgReplyFileList extends Message {
 	@Override
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
-			last = dis.readBoolean();
+			last = (dis.readByte() != 0);
 			files = new String[dis.readInt()];
 			for (int i = 0; i < files.length; i++)
 				files[i] = readString(dis);

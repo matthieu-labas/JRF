@@ -27,6 +27,11 @@ import fr.jfp.server.JFPProvider;
  * 
  * @author Matthieu Labas
  */
+
+// TODO: MTU setting to split potentially big messages (e.g. MsgData, MsgReplyFileList) into several smaller parts
+// TODO: Handle deflate compression when required upon opening
+// TODO: Create SocketFactory to use SSLSocket, UDTSocket
+
 public class JFPClient extends Thread {
 	
 	private static final Logger log = Logger.getLogger(JFPClient.class.getName());

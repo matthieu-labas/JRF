@@ -137,8 +137,7 @@ public class JFPServer extends Thread {
 		InetSocketAddress addr = hp == null || hp[0].isEmpty() ? new InetSocketAddress(port) : new InetSocketAddress(hp[0], port);
 		final JFPServer srv = JFPServer.get(addr);
 		Runtime.getRuntime().addShutdownHook(new Thread() {
-			@Override
-			public void run() {
+			@Override public void run() {
 				srv.requestStop();
 				while (srv.isAlive())
 					try{srv.join();}catch(InterruptedException e){}
@@ -180,8 +179,7 @@ public class JFPServer extends Thread {
 				
 				default:
 					System.out.println("Commands:");
-					System.out.println("X - Exit");
-					System.out.println("Q - Exit");
+					System.out.println("X|Q - Exit");
 					System.out.println("? - Show connected clients and opened files");
 					break;
 			}

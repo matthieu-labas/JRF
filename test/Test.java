@@ -10,12 +10,22 @@ import java.util.Date;
 
 import fr.jfp.RemoteFile;
 import fr.jfp.client.JFPClient;
+import fr.jfp.msg.file.MsgReplyFileInfos;
 import fr.jfp.server.JFPServer;
 
 public class Test {
 	
 	public static void printFileInfos(File f) {
 		System.out.println("File "+f.getAbsolutePath());
+		System.out.println("Length        : "+f.length());
+		System.out.println("Last modified : "+new Date(f.lastModified()));
+		System.out.println("isFile        : "+f.isFile());
+		System.out.println("isDirectory   : "+f.isDirectory());
+	}
+	
+	public static void printFileInfos(MsgReplyFileInfos f) {
+		System.out.println("File "+f.getName());
+		System.out.println("Attributes    : "+(f.canRead()?"r":"-")+(f.canWrite()?"w":"-")+(f.canExecute()?"x":"-"));
 		System.out.println("Length        : "+f.length());
 		System.out.println("Last modified : "+new Date(f.lastModified()));
 		System.out.println("isFile        : "+f.isFile());
@@ -34,6 +44,7 @@ public class Test {
 		String remf = "D:/Temp/test.txt";
 		File fil = new RemoteFile(cli, remf);
 		printFileInfos(fil); // Print file meta-information
+		printFileInfos(((RemoteFile)fil).getFileInfos()); // Print file meta-information, received all-in-one
 		int len = (int)fil.length();
 		System.out.println("Remote "+remf+" is "+len+" bytes");
 		byte[] buf = new byte[len+1];

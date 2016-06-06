@@ -28,10 +28,12 @@ import fr.jfp.msg.MsgOpen;
 import fr.jfp.msg.MsgRead;
 import fr.jfp.msg.MsgSkip;
 import fr.jfp.msg.file.MsgFile;
+import fr.jfp.msg.file.MsgFileInfos;
 import fr.jfp.msg.file.MsgFileIs;
 import fr.jfp.msg.file.MsgFileList;
 import fr.jfp.msg.file.MsgFileRoots;
 import fr.jfp.msg.file.MsgFileSpace;
+import fr.jfp.msg.file.MsgReplyFileInfos;
 import fr.jfp.msg.file.MsgReplyFileList;
 import fr.jfp.msg.file.MsgReplyFileLong;
 
@@ -255,14 +257,15 @@ public class JFPProvider extends Thread {
 			}
 			new MsgReplyFileLong(m.getNum(), val).send(sok);
 		} else if (msg instanceof MsgFileList) {
-			MsgFileList m = (MsgFileList)msg;
-			new MsgReplyFileList(m.getNum(), m.getFile().list()).send(sok);
+			new MsgReplyFileList(msg.getNum(), msg.getFile().list(), true).send(sok); // TODO: Split if too many files
+		} else if (msg instanceof MsgFileInfos) {
+			new MsgReplyFileInfos(msg.getNum(), msg.getFile()).send(sok);
 		} else if (msg instanceof MsgFileRoots) {
 			File[] roots = File.listRoots();
 			String[] rs = new String[roots.length];
 			for (int i = 0; i < roots.length; i++)
 				rs[i] = roots[i].getAbsolutePath();
-			new MsgReplyFileList(msg.getNum(), rs).send(sok);
+			new MsgReplyFileList(msg.getNum(), rs, true).send(sok);
 		} else {
 			log.warning(getName()+": Unhandled FileOp message "+msg);
 		}
