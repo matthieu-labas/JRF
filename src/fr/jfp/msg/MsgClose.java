@@ -18,24 +18,24 @@ public class MsgClose extends MsgFileCmd {
 	
 	// Mandatory no-arg constructor
 	public MsgClose() {
-		super(-1);
+		super((short)-1);
 	}
 	
-	public MsgClose(int fileID) {
+	public MsgClose(short fileID) {
 		super(fileID);
 	}
 	
 	@Override
 	protected ByteBufferOut encode() throws IOException {
 		ByteBufferOut bb = new ByteBufferOut(4);
-		bb.writeInt(fileID);
+		bb.writeShort(fileID);
 		return bb;
 	}
 	
 	@Override
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
-			fileID = dis.readInt();
+			fileID = dis.readShort();
 		}
 	}
 	

@@ -49,7 +49,7 @@ public class JFPProvider extends Thread {
 	private Socket sok;
 	
 	/** Map of locally open files. Key is the file ID. */
-	private Map<Integer,InputStream> localOpened;
+	private Map<Short,InputStream> localOpened;
 	
 	private volatile boolean goOn;
 	
@@ -60,6 +60,11 @@ public class JFPProvider extends Thread {
 	 */
 	JFPProvider(Socket sok) {
 		setName(JFPProvider.class.getSimpleName()+"/"+sa2Str((InetSocketAddress)sok.getLocalSocketAddress())+">"+sa2Str((InetSocketAddress)sok.getRemoteSocketAddress()));
+		try {
+			sok.setSoTimeout(JFPClient.TIMEOUT);
+		} catch (SocketException e) {
+			log.warning(getName()+": Unable to set timeout on "+sok+": "+e.getMessage());
+		}
 		try {
 			sok.setKeepAlive(true);
 		} catch (SocketException e) {
@@ -89,7 +94,7 @@ public class JFPProvider extends Thread {
 		}
 		
 		// Close the connection
-		JFPClient.gracefulClose(sok);
+		JFPClient.gracefulClose(sok, true);
 	}
 	
 	public void requestStop() {
@@ -99,18 +104,18 @@ public class JFPProvider extends Thread {
 	
 	// "Open file" command
 	private void handleOpen(MsgOpen m) throws IOException {
-		int num = m.getNum();
+		short num = m.getNum();
 		String file = m.getFile();
 		log.info(getName()+": Request open file "+file);
 		MsgAck ack;
 		try {
 			InputStream is = new FileInputStream(file);
-			ack = new MsgAck(num, fileCounter.incrementAndGet());
+			ack = new MsgAck(num, (short)(fileCounter.incrementAndGet() & 0xffff));
 			log.fine(getName()+": "+file+" > ID "+ack.getFileID());
 			localOpened.put(ack.getFileID(), is);
 		} catch (FileNotFoundException e) {
 			log.warning(getName()+": File not found "+file);
-			ack = new MsgAck(num, -1, MsgAck.WARN, e.getMessage());
+			ack = new MsgAck(num, (short)-1, MsgAck.WARN, e.getMessage());
 		}
 		try {
 			ack.send(sok);
@@ -122,8 +127,8 @@ public class JFPProvider extends Thread {
 	
 	// "Skip from file" command
 	private void handleSkip(MsgSkip m) throws IOException {
-		int num = m.getNum();
-		int fileID = m.getFileID();
+		short num = m.getNum();
+		short fileID = m.getFileID();
 		long skip = m.getSkip();
 		log.info(getName()+": Request skip "+skip+" bytes on file "+fileID);
 		MsgAck ack;
@@ -151,8 +156,8 @@ public class JFPProvider extends Thread {
 	
 	// "File read" command
 	private void handleRead(MsgRead m) throws IOException {
-		int num = m.getNum();
-		int fileID = m.getFileID();
+		short num = m.getNum();
+		short fileID = m.getFileID();
 		int len = m.getLength();
 		log.info(getName()+": Request read "+len+" bytes from file "+fileID);
 		MsgAck ack = null;
@@ -266,6 +271,7 @@ public class JFPProvider extends Thread {
 					log.warning(getName()+": Don't know how to handle file message "+msg);
 				}
 			} catch (SocketTimeoutException e) {
+				log.finest(getName()+": timeout...");
 				continue;
 			} catch (EOFException e) { // FIN received: graceful disconnection
 				log.info(getName()+": "+sok.getRemoteSocketAddress()+" disconnected. Ending.");

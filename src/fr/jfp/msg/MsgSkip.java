@@ -18,10 +18,10 @@ public class MsgSkip extends MsgFileCmd {
 	
 	// Mandatory no-arg constructor
 	public MsgSkip() {
-		super(-1);
+		super((short)-1);
 	}
 	
-	public MsgSkip(int fileID, long skip) {
+	public MsgSkip(short fileID, long skip) {
 		super(fileID);
 		this.skip = skip;
 	}
@@ -33,7 +33,7 @@ public class MsgSkip extends MsgFileCmd {
 	@Override
 	protected ByteBufferOut encode() throws IOException {
 		ByteBufferOut bb = new ByteBufferOut(12);
-		bb.writeInt(fileID);
+		bb.writeShort(fileID);
 		bb.writeLong(skip);
 		return bb;
 	}
@@ -41,7 +41,7 @@ public class MsgSkip extends MsgFileCmd {
 	@Override
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
-			fileID = dis.readInt();
+			fileID = dis.readShort();
 			skip = dis.readLong();
 		}
 	}

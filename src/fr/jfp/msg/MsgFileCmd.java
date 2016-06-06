@@ -12,18 +12,18 @@ package fr.jfp.msg;
 public abstract class MsgFileCmd extends Message {
 	
 	/** The file ID to close. */
-	protected int fileID;
+	protected short fileID;
 	
-	public MsgFileCmd(int replyTo, int fileID) {
+	public MsgFileCmd(short replyTo, short fileID) {
 		super(replyTo);
 		this.fileID = fileID;
 	}
 	
-	public MsgFileCmd(int fileID) {
-		this(-1, fileID);
+	public MsgFileCmd(short fileID) {
+		this((short)-1, fileID);
 	}
 	
-	public int getFileID() {
+	public short getFileID() {
 		return fileID;
 	}
 	

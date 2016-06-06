@@ -13,10 +13,10 @@ public class MsgRead extends MsgFileCmd {
 	
 	// Mandatory no-arg constructor
 	public MsgRead() {
-		super(-1);
+		super((short)-1);
 	}
 	
-	public MsgRead(int fileID, int len) {
+	public MsgRead(short fileID, int len) {
 		super(fileID);
 		this.len = len;
 	}
@@ -28,7 +28,7 @@ public class MsgRead extends MsgFileCmd {
 	@Override
 	protected ByteBufferOut encode() throws IOException {
 		ByteBufferOut bb = new ByteBufferOut(4);
-		bb.writeInt(fileID);
+		bb.writeShort(fileID);
 		bb.writeInt(len);
 		return bb;
 	}
@@ -36,7 +36,7 @@ public class MsgRead extends MsgFileCmd {
 	@Override
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
-			fileID = dis.readInt();
+			fileID = dis.readShort();
 			len = dis.readInt();
 		}
 	}

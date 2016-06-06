@@ -23,12 +23,12 @@ public class RemoteInputStream extends InputStream {
 	/** The remote absolute path to the file. */
 	private String remoteFile;
 	
-	private int fileID;
+	private short fileID;
 	
 	/** The client used to transfer commands to its connected {@link JFPProvider}. */
 	private JFPClient cli;
 	
-	public RemoteInputStream(String remoteFile, int fileID, JFPClient cli) {
+	public RemoteInputStream(String remoteFile, short fileID, JFPClient cli) {
 		this.remoteFile = remoteFile;
 		this.fileID = fileID;
 		this.cli = cli;

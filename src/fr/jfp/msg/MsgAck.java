@@ -32,21 +32,21 @@ public class MsgAck extends MsgFileCmd {
 	
 	// Mandatory no-arg constructor
 	public MsgAck() {
-		super(-1);
+		super((short)-1);
 	}
 	
-	public MsgAck(int replyTo, int fileID, long code, String msg) {
+	public MsgAck(short replyTo, short fileID, long code, String msg) {
 		super(fileID);
 		this.replyTo = replyTo;
 		this.code = code;
 		this.msg = msg;
 	}
 	
-	public MsgAck(int replyTo, int fileID) {
+	public MsgAck(short replyTo, short fileID) {
 		this(replyTo, fileID, OK);
 	}
 	
-	MsgAck(int replyTo, int fileID, long code) {
+	MsgAck(short replyTo, short fileID, long code) {
 		this(replyTo, fileID, code, null);
 	}
 	
@@ -64,7 +64,7 @@ public class MsgAck extends MsgFileCmd {
 		if (msg != null)
 			_msg = msg.getBytes(charset);
 		ByteBufferOut bb = new ByteBufferOut(12+(_msg == null ? 0 : _msg.length));
-		bb.writeInt(fileID);
+		bb.writeShort(fileID);
 		bb.writeLong(code);
 		if (_msg == null)
 			bb.writeInt(-1);
@@ -79,7 +79,7 @@ public class MsgAck extends MsgFileCmd {
 	@Override
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
-			fileID = dis.readInt();
+			fileID = dis.readShort();
 			code = dis.readLong();
 			int n = dis.readInt();
 			if (n < 0)

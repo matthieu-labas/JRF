@@ -65,12 +65,12 @@ public class ByteBufferOut extends DataOutputStream {
 	 */
 	public void writeString(String str) throws IOException {
 		if (str == null) {
-			writeInt(-1);
+			writeShort(-1);
 		} else if (str.isEmpty()) {
-			writeInt(-1);
+			writeShort(0);
 		} else {
 			byte[] buf = str.getBytes(Message.charset);
-			writeInt(buf.length);
+			writeShort(buf.length);
 			write(buf, 0, buf.length);
 		}
 	}

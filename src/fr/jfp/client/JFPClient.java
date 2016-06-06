@@ -31,6 +31,8 @@ public class JFPClient extends Thread {
 	
 	private static final Logger log = Logger.getLogger(JFPClient.class.getName());
 	
+	public static final int TIMEOUT = 1000;
+	
 	private Socket sok;
 	
 	/** Map of remotely open files. Key is the file ID. */
@@ -49,6 +51,11 @@ public class JFPClient extends Thread {
 	
 	JFPClient(Socket sok) {
 		setName("JFPClient "+sok.getLocalSocketAddress()+">"+sok.getRemoteSocketAddress());
+		try {
+			sok.setSoTimeout(TIMEOUT);
+		} catch (SocketException e) {
+			log.warning(getName()+": Unable to set timeout on "+sok+": "+e.getMessage());
+		}
 		try {
 			sok.setKeepAlive(true);
 		} catch (SocketException e) {
@@ -119,7 +126,7 @@ public class JFPClient extends Thread {
 		remoteOpened.clear();
 		
 		// Close the connection
-		gracefulClose(sok);
+		gracefulClose(sok, true);
 	}
 	
 	/** Stops the Client and closes its connection to the Server. */
@@ -148,7 +155,7 @@ public class JFPClient extends Thread {
 					throw new FileNotFoundException(err);
 				throw new IOException(err);
 			}
-			int fileID = msg.getFileID();
+			short fileID = msg.getFileID();
 			RemoteInputStream ris = new RemoteInputStream(remoteFile, fileID, this);
 			synchronized (this) {
 				remoteOpened.put(Integer.valueOf(fileID), ris);
@@ -225,12 +232,15 @@ public class JFPClient extends Thread {
 	 * Performs a graceful close on the given Socket. Data still in the socket input buffer will be
 	 * silently discarded.
 	 * @param sok The socket to gracefully close.
+	 * @param flush {@code true} if the socket input stream should be emptied.
 	 * @see <a href="http://stackoverflow.com/a/9399617/1098603">http://stackoverflow.com/a/9399617/1098603</a> :)
 	 */
-	public static void gracefulClose(Socket sok) {
+	public static void gracefulClose(Socket sok, boolean flush) {
+		if (sok.isClosed())
+			return;
 		try {
 			sok.shutdownOutput(); // Send FIN, which might close the socket and throw an IOException in run(), blocked on Message.receive(). Socket would then be closed.
-			if (!sok.isClosed()) {
+			if (flush && !sok.isClosed()) {
 				byte[] buf = new byte[1024];
 				InputStream is = sok.getInputStream();
 				while (is.read(buf) >= 0) ;
@@ -267,7 +277,7 @@ public class JFPClient extends Thread {
 					RemoteInputStream ris = remoteOpened.get(fileID);
 					if (ris == null) { // Cannot find client: send a close()
 						log.warning(getName()+": Cannot find remote opened file with ID "+fileID+", closing file... (message "+msg+")");
-						new MsgClose(fileID.intValue()).send(sok);
+						new MsgClose(fileID.shortValue()).send(sok);
 					} else { // Handle "spontaneous" messages
 						ris.spontaneousMessage(msg);
 					}
@@ -275,6 +285,7 @@ public class JFPClient extends Thread {
 					log.severe(getName()+": Unknown message "+msg);
 				}
 			} catch (SocketTimeoutException e) {
+				log.finest(getName()+": timeout...");
 				continue;
 			} catch (IOException e) {
 				if (goOn) {

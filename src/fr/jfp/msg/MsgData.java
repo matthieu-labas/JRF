@@ -29,7 +29,7 @@ public class MsgData extends MsgFileCmd {
 	
 	// Mandatory no-arg constructor
 	public MsgData() {
-		super(-1);
+		super((short)-1);
 	}
 	
 	/**
@@ -40,7 +40,7 @@ public class MsgData extends MsgFileCmd {
 	 * @param data The chunk data.
 	 * @param deflate If {@code > 0}, {@code data} will be deflated before being stored.
 	 */
-	public MsgData(int replyTo, int fileID, byte[] data, int len, int deflate) {
+	public MsgData(short replyTo, short fileID, byte[] data, int len, int deflate) {
 		super(replyTo, fileID);
 		this.deflate = deflate;
 		this.len = len;
@@ -65,8 +65,8 @@ public class MsgData extends MsgFileCmd {
 	@Override
 	protected ByteBufferOut encode() throws IOException {
 		ByteBufferOut bb = new ByteBufferOut(8+len);
-		bb.writeInt(fileID);
-		bb.writeInt(deflate);
+		bb.writeShort(fileID);
+		bb.writeByte(deflate); // Between 0 and 9
 		bb.writeInt(len);
 		bb.write(data, 0, len);
 		return bb;
@@ -76,8 +76,8 @@ public class MsgData extends MsgFileCmd {
 	protected void decode(byte[] buf) throws IOException {
 		len = buf.length - 8; // 8 being the two int 'fileID' and 'deflate'
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
-			fileID = dis.readInt();
-			deflate = dis.readInt();
+			fileID = dis.readShort();
+			deflate = dis.readByte();
 			len = dis.readInt();
 			data = new byte[len];
 			dis.readFully(data);

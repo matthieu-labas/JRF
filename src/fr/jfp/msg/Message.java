@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import fr.jfp.ByteBufferOut;
@@ -22,9 +23,9 @@ import fr.jfp.ByteBufferOut;
  * <table border="1" style="border-collapse:collapse">
  * <tr bgcolor="silver"><th><strong>Field</strong></th><th><strong>Size</strong></th><th></th></tr>
  * <tr><td><strong>Marker</strong></td><td>4</td><td>{@code "_JFP"}</td></tr>
- * <tr><td><strong>Message number</strong></td><td>4</td><td>Starts at {@code 1}</td></tr>
- * <tr><td><strong>Reply to</strong></td><td>4</td><td>Message number to which this message replies</td></tr>
- * <tr><td><strong>Type length</strong></td><td>4</td><td></td></tr>
+ * <tr><td><strong>Message number</strong></td><td>2</td><td>Starts at {@code 1}</td></tr>
+ * <tr><td><strong>Reply to</strong></td><td>2</td><td>Message number to which this message replies</td></tr>
+ * <tr><td><strong>Type length</strong></td><td>2</td><td></td></tr>
  * <tr><td><strong>Type content</strong></td><td><em>&lt;<code>type length</code>&gt;</em></td><td>(class name in {@link #PACKAGE})</td></tr>
  * <tr><td><strong>Body length</strong></td><td>4</td><td></td></tr>
  * <tr><td><strong>Body content</strong></td><td><em>&lt;<code>body length</code>&gt;</em></td><td></td></tr>
@@ -42,31 +43,29 @@ public abstract class Message {
 	
 	public static final byte[] MARKER = "_JFP".getBytes(charset);
 	
-	/** Message counter. Its access should be {@code synchronized} on {@code Message.class}. */
-	private static volatile int numCounter = 0;
+	/** Message counter. */
+	private static AtomicInteger numCounter = new AtomicInteger();
 	
 	/** Message number. */
-	protected int num;
+	protected short num;
 	
 	/** Message number to which this message replies. */
-	protected int replyTo;
+	protected short replyTo;
 	
-	protected Message(int replyTo) {
+	protected Message(short replyTo) {
 		this.replyTo = replyTo;
-		synchronized (Message.class) {
-			num = ++numCounter;
-		}
+		num = (short)(numCounter.incrementAndGet() & 0xfff);
 	}
 	
 	protected Message() {
-		this(-1);
+		this((short)-1);
 	}
 	
-	public int getNum() {
+	public short getNum() {
 		return num;
 	}
 	
-	public int getReplyTo() {
+	public short getReplyTo() {
 		return replyTo;
 	}
 	
@@ -89,7 +88,7 @@ public abstract class Message {
 	 * @throws IOException from reading {@code data}.
 	 */
 	protected static String readString(DataInput data) throws IOException {
-		int sz = data.readInt();
+		int sz = data.readShort();
 		if (sz < 0)
 			return null;
 		if (sz == 0)
@@ -147,8 +146,8 @@ public abstract class Message {
 		int sz = MARKER.length+16+cls.length()+bb.size();
 		try (ByteBufferOut data = new ByteBufferOut(sz)) {
 			data.write(MARKER); // Marker
-			data.writeInt(num); // Message number
-			data.writeInt(replyTo); // Reply to
+			data.writeShort(num); // Message number
+			data.writeShort(replyTo); // Reply to
 			data.writeString(cls); // Type
 			data.writeInt(bb.size()); // Body size
 			data.write(bb.getRawArray(), 0, bb.size()); // Body
@@ -181,8 +180,8 @@ public abstract class Message {
 			throw new IOException("Bad marker "+new String(mrk, charset));
 		mrk = null;
 		
-		int num = dis.readInt();
-		int replyTo = dis.readInt();
+		short num = dis.readShort();
+		short replyTo = dis.readShort();
 		String clsName = readString(dis);
 		Message msg;
 		Class<?> cls;
@@ -193,7 +192,7 @@ public abstract class Message {
 		}
 		try {
 			synchronized (Message.class) {
-				numCounter--; // The nullary constructor will pre-increment numCounter, so to prevent jumps in message numbers we have to counter it ;)
+				numCounter.decrementAndGet(); // The nullary constructor will pre-increment numCounter, so to prevent jumps in message numbers we have to counter it ;)
 				msg = (Message)cls.newInstance();
 			}
 		} catch (InstantiationException | IllegalAccessException e) {

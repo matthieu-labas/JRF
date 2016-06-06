@@ -24,10 +24,10 @@ public class MsgReplyFileLong extends Message {
 	
 	// Mandatory nullary constructor
 	public MsgReplyFileLong() {
-		this(-1, -1l);
+		this((short)-1, -1l);
 	}
 	
-	public MsgReplyFileLong(int replyTo, long val) {
+	public MsgReplyFileLong(short replyTo, long val) {
 		super(replyTo);
 		this.val = val;
 	}

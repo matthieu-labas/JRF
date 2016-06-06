@@ -23,10 +23,10 @@ public class MsgReplyFileList extends Message {
 	
 	// Mandatory no-arg constructor
 	public MsgReplyFileList() {
-		this(-1, null);
+		this((short)-1, null);
 	}
 	
-	public MsgReplyFileList(int replyTo, String[] files) {
+	public MsgReplyFileList(short replyTo, String[] files) {
 		super(replyTo);
 		this.files = files;
 	}

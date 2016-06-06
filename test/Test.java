@@ -2,6 +2,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.Date;
 
 import fr.jfp.RemoteFile;
@@ -18,7 +22,7 @@ public class Test {
 		System.out.println("isDirectory   : "+f.isDirectory());
 	}
 	
-	public static void main(String[] args) throws IOException {
+	public static void test() throws IOException {
 		JFPServer srv = JFPServer.get(2205);
 		srv.start();
 		JFPClient cli = new JFPClient(new InetSocketAddress("127.0.0.1", 2205));
@@ -49,5 +53,66 @@ public class Test {
 			try{Thread.sleep(200);}catch(InterruptedException e){}
 		System.out.println("The end. Average latency "+cli.getLatency()+" µs");
 	}
-
+	
+	static Socket cli = null;
+	@SuppressWarnings("resource")
+	public static void testNBSok() {
+		Thread th = new Thread() {
+			@Override public void run() {
+				ServerSocket srv = null;
+				try {
+					srv = new ServerSocket(2205);
+					cli = srv.accept();
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					if (srv != null) {
+						try {
+							srv.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		};
+		th.start();
+		Socket cli2;
+		try {
+			cli2 = new Socket("localhost", 2205);
+		} catch (IOException e) {
+			System.out.println("Exception "+e.getClass().getSimpleName()+" - "+e.getMessage());
+			return;
+		}
+		while (th.isAlive())
+			try { th.join(); } catch (InterruptedException e) { }
+		try {
+			cli.setSoTimeout(1000);
+		} catch (SocketException e) {
+			System.out.println("Exception "+e.getClass().getSimpleName()+" - "+e.getMessage());
+		}
+		while (!cli.isClosed()) {
+			int n = 0;
+			try {
+				System.out.println((char)cli.getInputStream().read());
+			} catch (SocketTimeoutException e) {
+				System.out.println("Timeout");
+				try {
+					cli2.getOutputStream().write('a'+(n++));
+				} catch (IOException e1) {
+					System.out.println("Exception "+e.getClass().getSimpleName()+" - "+e.getMessage());
+					try {cli.close();}catch (IOException e2){}
+				}
+			} catch (IOException e) {
+				System.out.println("Exception "+e.getClass().getSimpleName()+" - "+e.getMessage());
+				try {cli.close();}catch (IOException e2){}
+			}
+		}
+	}
+	
+	public static void main(String[] args) throws IOException {
+		test();
+//		testNBSok();
+	}
+	
 }
