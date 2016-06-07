@@ -54,7 +54,7 @@ public abstract class Message {
 	
 	protected Message(short replyTo) {
 		this.replyTo = replyTo;
-		num = (short)(numCounter.incrementAndGet() & 0xfff);
+		num = (short)(numCounter.incrementAndGet() & 0xffff);
 	}
 	
 	protected Message() {

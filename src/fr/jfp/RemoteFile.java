@@ -137,94 +137,56 @@ public class RemoteFile extends File {
 //		}
 //	}
 	
+	private void checkRefresh() {
+		if (init)
+			return;
+		try {
+			refresh();
+			ex = null;
+		} catch (IOException e) {
+			ex = e;
+		}
+	}
+	
 	@Override
 	public boolean exists() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return (attributes != 0);
 	}
 	
 	@Override
 	public boolean isFile() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return (attributes & FileInfos.BIT_ISFILE) != 0;
 	}
 	
 	@Override
 	public boolean isDirectory() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return (attributes & FileInfos.BIT_ISDIRECTORY) != 0;
 	}
 	
 	@Override
 	public boolean isHidden() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return (attributes & FileInfos.BIT_ISHIDDEN) != 0;
 	}
 	
 	@Override
 	public boolean canRead() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return (attributes & FileInfos.BIT_CANREAD) != 0;
 	}
 	
 	@Override
 	public boolean canWrite() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return (attributes & FileInfos.BIT_CANWRITE) != 0;
 	}
 	
 	@Override
 	public boolean canExecute() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return (attributes & FileInfos.BIT_CANEXECUTE) != 0;
 	}
 	
@@ -247,14 +209,7 @@ public class RemoteFile extends File {
 	
 	@Override
 	public long length() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return length;
 	}
 	
@@ -280,14 +235,7 @@ public class RemoteFile extends File {
 	
 	@Override
 	public long lastModified() {
-		if (!init) {
-			try {
-				refresh();
-				ex = null;
-			} catch (IOException e) {
-				ex = e;
-			}
-		}
+		checkRefresh();
 		return lastModified;
 	}
 	
