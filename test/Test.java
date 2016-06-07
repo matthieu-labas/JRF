@@ -57,7 +57,7 @@ public class Test {
 		File[] roots = RemoteFile.listRoots(cli);
 		System.out.println("Remote roots:");
 		for (File f : roots)
-			System.out.println(String.format("%c %20.20s %s %d bytes", f.isDirectory() ? 'd' : 'f', f.getPath()+File.separator+f.getName(), new Date(f.lastModified()), f.length()));
+			System.out.println(String.format("%c [%20.20s] %s %d bytes", f.isDirectory() ? 'd' : 'f', f.getPath()+File.separator+f.getName(), new Date(f.lastModified()), f.length()));
 		
 		cli.requestStop();
 		while (cli.isAlive())

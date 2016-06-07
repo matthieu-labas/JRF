@@ -2,9 +2,11 @@ package fr.jfp.msg.file;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.File;
 import java.io.IOException;
 
 import fr.jfp.ByteBufferOut;
+import fr.jfp.FileInfos;
 import fr.jfp.msg.Message;
 
 /**
@@ -16,7 +18,7 @@ import fr.jfp.msg.Message;
 public class MsgReplyFileList extends Message {
 	
 	/** The list of file names. */
-	protected String[] files;
+	protected FileInfos[] infos;
 	
 	/** Indicate this is the last message. */
 	protected boolean last;
@@ -26,9 +28,9 @@ public class MsgReplyFileList extends Message {
 		this((short)-1, null, false);
 	}
 	
-	public MsgReplyFileList(short replyTo, String[] files, boolean last) {
+	public MsgReplyFileList(short replyTo, File[] files, boolean last) {
 		super(replyTo);
-		this.files = files;
+		setFiles(files);
 		this.last = last;
 	}
 	
@@ -36,24 +38,30 @@ public class MsgReplyFileList extends Message {
 		return last;
 	}
 	
-	public String[] getFiles() {
-		return files;
+	public FileInfos[] getFiles() {
+		return infos;
 	}
 	
-	public void setFiles(String[] files) {
-		this.files = files;
+	public void setFiles(File[] files) {
+		if (files == null) {
+			infos = null;
+			return;
+		}
+		infos = new FileInfos[files.length];
+		for (int i = 0; i < files.length; i++)
+			infos[i] = new FileInfos(files[i]);
 	}
 	
 	@Override
 	protected ByteBufferOut encode() throws IOException {
-		int n = 8;
-		for (String f : files)
-			n += 2*f.length();
+		int n = 5;
+		for (FileInfos f : infos)
+			n += f.guessEncodedSize();
 		ByteBufferOut bb = new ByteBufferOut(n);
 		bb.writeByte(last ? 0 : 1);
-		bb.writeInt(files.length);
-		for (String f : files)
-			bb.writeString(f);
+		bb.writeInt(infos.length);
+		for (FileInfos f : infos)
+			f.encodeAppend(bb);
 		return bb;
 	}
 	
@@ -61,15 +69,15 @@ public class MsgReplyFileList extends Message {
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
 			last = (dis.readByte() != 0);
-			files = new String[dis.readInt()];
-			for (int i = 0; i < files.length; i++)
-				files[i] = readString(dis);
+			infos = new FileInfos[dis.readInt()];
+			for (int i = 0; i < infos.length; i++)
+				infos[i] = new FileInfos(dis);
 		}
 	}
 	
 	@Override
 	public String toString() {
-		return stdToString()+" "+files.length+" files";
+		return stdToString()+(infos == null ? " ?" : " "+infos.length)+" files";
 	}
 	
 }

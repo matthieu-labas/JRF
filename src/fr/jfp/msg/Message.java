@@ -87,7 +87,7 @@ public abstract class Message {
 	 * @return The {@code String}.
 	 * @throws IOException from reading {@code data}.
 	 */
-	protected static String readString(DataInput data) throws IOException {
+	public static String readString(DataInput data) throws IOException {
 		int sz = data.readShort();
 		if (sz < 0)
 			return null;

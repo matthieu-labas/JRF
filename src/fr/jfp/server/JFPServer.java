@@ -80,13 +80,23 @@ public class JFPServer extends Thread {
 		}
 	}
 	
+	void providerClosed(JFPProvider prov) {
+		if (!goOn) // Closing in progress
+			return;
+		synchronized (clients) {
+			clients.remove(prov);
+		}
+	}
+	
 	@Override
 	public void run() {
 		while (goOn) {
 			try {
 				Socket sok = srv.accept();
-				JFPProvider cli = new JFPProvider(sok);
-				clients.add(cli);
+				JFPProvider cli = new JFPProvider(sok, this);
+				synchronized (clients) {
+					clients.add(cli);
+				}
 				log.info("Connection from "+sok.getRemoteSocketAddress());
 				cli.start();
 			} catch (SocketTimeoutException e) {
@@ -97,6 +107,14 @@ public class JFPServer extends Thread {
 			}
 		}
 		log.info("Server closed.");
+		
+		synchronized (clients) {
+			for (JFPProvider prov : clients)
+				prov.requestStop();
+			for (JFPProvider prov : clients)
+				try{prov.join();}catch(InterruptedException e){}
+			clients = null;
+		}
 		
 		synchronized (instances) {
 			instances.values().remove(this);
@@ -149,12 +167,10 @@ public class JFPServer extends Thread {
 		Scanner sc = new Scanner(System.in);
 		while (srv.isAlive()) {
 			System.out.print("$ ");
-			String c = sc.next();
+			String c = sc.next().toLowerCase();
 			switch (c) {
 				case "q":
-				case "Q":
 				case "x":
-				case "X":
 					System.out.print("\nDo you want to exit (y/N)? ");
 					c = sc.next();
 					if ("y".equalsIgnoreCase(c)) {
@@ -165,15 +181,17 @@ public class JFPServer extends Thread {
 					break;
 				
 				case "?":
-					if (srv.clients.isEmpty()) {
-						System.out.println("No client connected.");
-						break;
-					}
-					System.out.println(srv.clients.size()+" client(s) connected:");
-					for (JFPProvider prov : srv.clients) {
-						System.out.println(prov.getRemote());
-						for (String fi : prov.getOpenedFiles())
-							System.out.println("    "+fi);
+					synchronized (srv.clients) {
+						if (srv.clients.isEmpty()) {
+							System.out.println("No client connected.");
+							break;
+						}
+						System.out.println(srv.clients.size()+" client(s) connected:");
+						for (JFPProvider prov : srv.clients) {
+							System.out.println(prov.getRemote());
+							for (String fi : prov.getOpenedFiles())
+								System.out.println("    "+fi);
+						}
 					}
 					break;
 				

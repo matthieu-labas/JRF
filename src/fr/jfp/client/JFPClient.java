@@ -21,6 +21,7 @@ import fr.jfp.msg.MsgClose;
 import fr.jfp.msg.MsgFileCmd;
 import fr.jfp.msg.MsgOpen;
 import fr.jfp.server.JFPProvider;
+import fr.jfp.server.JFPServer;
 
 /**
  * The JFP Client is used to send file commands to a {@link JFPProvider}.
@@ -304,6 +305,48 @@ public class JFPClient extends Thread {
 		// End of thread: close all remainig remote files and terminate connection gracefully
 		close();
 		log.info(getName()+": closed.");
+	}
+	
+	
+	
+	public static void usage() {
+		System.out.println("Options: <hostname[:port]> of the JFP Server to connect to.");
+	}
+	
+	public static void main(String[] args) {
+		if (args.length != 1) {
+			usage();
+			System.exit(1);
+		}
+		
+		int port = JFPServer.DEFAULT_PORT;
+		String[] hp = args[0].split(":");
+		if (hp.length > 1) {
+			try {
+				port = Integer.parseInt(hp[1]);
+			} catch (NumberFormatException e) {
+				System.err.println("Cannot parse port '"+hp[1]+"'");
+				System.exit(2);
+			}
+		}
+		
+		final JFPClientCLI cli;
+		try {
+			JFPClient cl = new JFPClient(new InetSocketAddress(hp[0], port));
+			cl.start();
+			cli = new JFPClientCLI(cl);
+		} catch (IOException e) {
+			System.err.print("Cannot connect to "+args[0]+": "+e.getMessage());
+			System.exit(2);
+			return;
+		}
+		System.out.println("Connected to "+args[0]);
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override public void run() {
+				cli.stop();
+			}
+		});
+		cli.run();
 	}
 	
 }

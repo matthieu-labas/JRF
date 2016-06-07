@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 
 import fr.jfp.ByteBufferOut;
+import fr.jfp.FileInfos;
 import fr.jfp.msg.Message;
 
 /**
@@ -15,17 +16,7 @@ import fr.jfp.msg.Message;
  */
 public class MsgReplyFileInfos extends Message {
 	
-	protected static final int BIT_ISFILE = 1 << 0;
-	protected static final int BIT_ISDIRECTORY = 1 << 1;
-	protected static final int BIT_ISHIDDEN = 1 << 2;
-	protected static final int BIT_CANREAD = 1 << 3;
-	protected static final int BIT_CANWRITE = 1 << 4;
-	protected static final int BIT_CANEXECUTE = 1 << 5;
-	
-	protected String name;
-	protected long length;
-	protected long lastModified;
-	protected byte attributes;
+	protected FileInfos infos;
 	
 	// Mandatory nullary constructor
 	public MsgReplyFileInfos() {
@@ -34,79 +25,71 @@ public class MsgReplyFileInfos extends Message {
 	
 	public MsgReplyFileInfos(short replyTo, File f) {
 		super(replyTo);
-		if (f != null) {
-			name = f.getName();
-			length = f.length();
-			lastModified = f.lastModified();
-			attributes = 0;
-			if (f.isDirectory()) attributes |= BIT_ISDIRECTORY;
-			if (f.isFile())      attributes |= BIT_ISFILE;
-			if (f.isHidden())    attributes |= BIT_ISHIDDEN;
-			if (f.canRead())     attributes |= BIT_CANREAD;
-			if (f.canWrite())    attributes |= BIT_CANWRITE;
-			if (f.canExecute())  attributes |= BIT_CANEXECUTE;
-		}
+		if (f != null)
+			infos = new FileInfos(f);
 	}
 	
 	public String getName() {
-		return name;
+		return infos.getName();
 	}
 	
 	public long length() {
-		return length;
+		return infos.length();
 	}
 	
 	public long lastModified() {
-		return lastModified;
+		return infos.lastModified();
+	}
+	
+	public byte getAttributes() {
+		return infos.getAttributes();
 	}
 	
 	public boolean isDirectory() {
-		return (attributes & BIT_ISDIRECTORY) != 0;
+		return infos.isDirectory();
 	}
 	
 	public boolean isFile() {
-		return (attributes & BIT_ISFILE) != 0;
+		return infos.isFile();
 	}
 	
 	public boolean isHidden() {
-		return (attributes & BIT_ISFILE) != 0;
+		return infos.isHidden();
 	}
 	
 	public boolean canRead() {
-		return (attributes & BIT_CANREAD) != 0;
+		return infos.canRead();
 	}
 	
 	public boolean canWrite() {
-		return (attributes & BIT_CANWRITE) != 0;
+		return infos.canWrite();
 	}
 	
 	public boolean canExecute() {
-		return (attributes & BIT_CANEXECUTE) != 0;
+		return infos.canExecute();
 	}
 	
 	@Override
 	protected ByteBufferOut encode() throws IOException {
+		String name = infos.getName();
 		ByteBufferOut bb = new ByteBufferOut(19+2*name.length());
 		bb.writeString(name);
-		bb.writeLong(length);
-		bb.writeLong(lastModified);
-		bb.write(attributes);
+		bb.writeLong(infos.length());
+		bb.writeLong(infos.lastModified());
+		bb.write(infos.getAttributes());
 		return bb;
 	}
 	
 	@Override
 	protected void decode(byte[] buf) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
-			name = readString(dis);
-			length = dis.readLong();
-			lastModified = dis.readLong();
-			attributes = dis.readByte();
+			infos = new FileInfos(readString(dis), dis.readLong(), dis.readLong(), dis.readByte());
 		}
 	}
 	
 	@Override
 	public String toString() {
-		return stdToString()+":"+name;
+		return stdToString()+":"+infos;
 	}
 	
 }

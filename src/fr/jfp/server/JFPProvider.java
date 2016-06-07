@@ -28,6 +28,7 @@ import fr.jfp.msg.MsgOpen;
 import fr.jfp.msg.MsgRead;
 import fr.jfp.msg.MsgSkip;
 import fr.jfp.msg.file.MsgFile;
+import fr.jfp.msg.file.MsgFileDelete;
 import fr.jfp.msg.file.MsgFileInfos;
 import fr.jfp.msg.file.MsgFileIs;
 import fr.jfp.msg.file.MsgFileList;
@@ -52,6 +53,9 @@ public class JFPProvider extends Thread {
 	
 	private Socket sok;
 	
+	/** The Server to report close event to. */
+	private JFPServer srv;
+	
 	/** Map of locally open files. Key is the file ID. */
 	private Map<Short,NamedFileInputStream> localOpened;
 	
@@ -62,7 +66,8 @@ public class JFPProvider extends Thread {
 	 * given socket.
 	 * @param sok The connection to the remote {@code JFPClient}.
 	 */
-	JFPProvider(Socket sok) {
+	JFPProvider(Socket sok, JFPServer srv) {
+		this.srv = srv;
 		setName(JFPProvider.class.getSimpleName()+"/"+sa2Str((InetSocketAddress)sok.getLocalSocketAddress())+">"+sa2Str((InetSocketAddress)sok.getRemoteSocketAddress()));
 		try {
 			sok.setSoTimeout(JFPClient.TIMEOUT);
@@ -117,6 +122,7 @@ public class JFPProvider extends Thread {
 		
 		// Close the connection
 		JFPClient.gracefulClose(sok, true);
+		srv.providerClosed(this);
 	}
 	
 	public void requestStop() {
@@ -236,6 +242,7 @@ public class JFPProvider extends Thread {
 	
 	private void handleFileOp(MsgFile msg) throws IOException {
 		log.info(getName()+": Request FileOp "+msg);
+		
 		if (msg instanceof MsgFileIs) {
 			MsgFileIs m = (MsgFileIs)msg;
 			boolean is = false;
@@ -245,6 +252,16 @@ public class JFPProvider extends Thread {
 				case IS_DIRECTORY: is = m.getFile().isDirectory(); break;
 			}
 			new MsgReplyFileLong(m.getNum(), is ? 1l : 0l).send(sok);
+		
+		} else if (msg instanceof MsgFileList) {
+			new MsgReplyFileList(msg.getNum(), msg.getFile().listFiles(), true).send(sok); // TODO: Split if too many files
+			
+		} else if (msg instanceof MsgFileDelete) {
+			new MsgReplyFileLong(msg.getNum(), msg.getFile().delete() ? 1l : 0l).send(sok);
+			
+		} else if (msg instanceof MsgFileInfos) {
+			new MsgReplyFileInfos(msg.getNum(), msg.getFile()).send(sok);
+			
 		} else if (msg instanceof MsgFileSpace) {
 			MsgFileSpace m = (MsgFileSpace)msg;
 			long val = 0l;
@@ -256,16 +273,10 @@ public class JFPProvider extends Thread {
 				case USABLE_SPACE: val = m.getFile().getUsableSpace(); break;
 			}
 			new MsgReplyFileLong(m.getNum(), val).send(sok);
-		} else if (msg instanceof MsgFileList) {
-			new MsgReplyFileList(msg.getNum(), msg.getFile().list(), true).send(sok); // TODO: Split if too many files
-		} else if (msg instanceof MsgFileInfos) {
-			new MsgReplyFileInfos(msg.getNum(), msg.getFile()).send(sok);
+		
 		} else if (msg instanceof MsgFileRoots) {
-			File[] roots = File.listRoots();
-			String[] rs = new String[roots.length];
-			for (int i = 0; i < roots.length; i++)
-				rs[i] = roots[i].getAbsolutePath();
-			new MsgReplyFileList(msg.getNum(), rs, true).send(sok);
+			new MsgReplyFileList(msg.getNum(), File.listRoots(), true).send(sok);
+		
 		} else {
 			log.warning(getName()+": Unhandled FileOp message "+msg);
 		}
