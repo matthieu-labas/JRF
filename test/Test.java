@@ -10,6 +10,7 @@ import java.util.Date;
 
 import fr.jfp.RemoteFile;
 import fr.jfp.client.JFPClient;
+import fr.jfp.client.JFPClientCLI;
 import fr.jfp.msg.file.MsgReplyFileInfos;
 import fr.jfp.server.JFPServer;
 
@@ -121,8 +122,24 @@ public class Test {
 		}
 	}
 	
+	public static void testEscape() {
+		for (String s : JFPClientCLI.splitCommand("cd \"di wi sp\" \"and another\""))
+			System.out.print("["+s+"] ");
+		System.out.println();
+		for (String s : JFPClientCLI.splitCommand("get file\\ with\\ spaces.txt"))
+			System.out.print("["+s+"] ");
+		System.out.println();
+		for (String s : JFPClientCLI.splitCommand("get file\\\"with\\\"doublequote.txt"))
+			System.out.print("["+s+"] ");
+		System.out.println();
+		for (String s : JFPClientCLI.splitCommand("get \"file \\\"with\\\"\\ doublequote.txt\" and\\ another"))
+			System.out.print("["+s+"] ");
+		System.out.println();
+	}
+	
 	public static void main(String[] args) throws IOException {
-		test();
+//		test();
+		testEscape();
 //		testNBSok();
 	}
 	

@@ -6,7 +6,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Scanner;
 
 import fr.jfp.RemoteFile;
@@ -44,9 +46,68 @@ public class JFPClientCLI implements Runnable {
 			try{cli.join();}catch(InterruptedException e){}
 	}
 	
-	private static String[] splitCommand(String line) {
-		// TODO: Split 'line', escaping spaces with quotes and backslash
-		return line.split(" ");
+	public static String[] splitCommand(String line) {
+		line = line.trim();
+		List<String> tokens = new ArrayList<>();
+		int i0 = 0;
+		boolean inEsc = false; // true when spaces should be escaped
+		boolean remBS = false; // true to remove the backslashes-escapes
+		boolean remDQ = false; // true to remove the double-quotes-escapes
+		for (int i = i0; i < line.length(); i++) {
+			char ch = line.charAt(i);
+			if (ch == '\\') { // Escape next character
+				remBS = true;
+				i++;
+				continue;
+			}
+			if (ch == '"') { // Start/End escaped sequence
+				if (!inEsc) {
+					remDQ = true;
+					i++;
+				}
+				inEsc = !inEsc;
+				continue;
+			}
+			if (Character.isWhitespace(ch) && !inEsc) {
+				String sub;
+				if (remDQ) {
+					sub = line.substring(i0+1, i-1).trim();
+					remDQ = false;
+				} else
+					sub = line.substring(i0, i).trim();
+				if (remBS) {
+					sub = sub.replace("\\", "");
+					remBS = false;
+				}
+				tokens.add(sub);
+				for (i0 = i; i0 < line.length() && Character.isWhitespace(line.charAt(i0)); i0++) ;
+				continue;
+			}
+		}
+		if (i0 < line.length()) {
+			String sub;
+			if (remDQ)
+				sub = line.substring(i0+1, line.length()-1).trim();
+			else
+				sub = line.substring(i0).trim();
+			if (remBS) sub = sub.replace("\\", "");
+			tokens.add(sub);
+		}
+		return tokens.toArray(new String[0]);
+	}
+	
+	/**
+	 * <p>Tries to determine whether the given {@code path} is an absolute path.</p>
+	 * <p>Under *nix, it's easy: {@code path} should start with a {@code '/'}.<br/>
+	 * Under Windows, it's a little bit trickier (as usual...): 2nd character is {@code ':'}, 1st
+	 * being the drive letter, or 1st character is a {@code '\'} (then good luck find the drive).</p>
+	 * @param path The path to check
+	 * @return
+	 */
+	public static boolean isAbsolute(String path) {
+		if (path.charAt(0) == File.separatorChar) // Starts with '/' on *nix, or '\' on Windows
+			return true;
+		return (File.separatorChar == '\\' && path.charAt(1) == ':'); // Windows
 	}
 	
 	/** Starts the CLI. The method blocks until the user requested a stop. Once the method returns,
@@ -74,7 +135,7 @@ public class JFPClientCLI implements Runnable {
 					RemoteFile nrem;
 					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
 					try {
-						if (remote == null)
+						if (remote == null || isAbsolute(arg1))
 							nrem = new RemoteFile(cli, arg1);
 						else {
 							if ("..".equals(arg1)) {
@@ -101,7 +162,9 @@ public class JFPClientCLI implements Runnable {
 				case "lcd": {
 					File nloc;
 					arg1 = cmds.length > 1 ? cmds[1] : sc.next();
-					if ("..".equals(arg1)) {
+					if (isAbsolute(arg1))
+						nloc = new File(arg1);
+					else if ("..".equals(arg1)) {
 						String parent = local.getParent();
 						if (parent != null) // 'remote' is a root => no change
 							nloc = new File(parent);
