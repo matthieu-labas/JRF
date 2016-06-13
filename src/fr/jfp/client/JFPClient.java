@@ -274,8 +274,8 @@ public class JFPClient extends Thread {
 	 * @param local The local file to write to.
 	 * @throws IOException
 	 */
-	public long getFile(String remote, int deflate, String local) throws IOException {
-		short num = new MsgGet(remote, deflate).send(sok);
+	public long getFile(String remote, int deflate, String local, int mtu) throws IOException {
+		short num = new MsgGet(remote, deflate, mtu).send(sok);
 		long len = 0l;
 		try (OutputStream os = new BufferedOutputStream(new FileOutputStream(local))) {
 			Message m;

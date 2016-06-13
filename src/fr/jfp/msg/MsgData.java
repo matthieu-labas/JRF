@@ -3,6 +3,7 @@ package fr.jfp.msg;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
@@ -12,11 +13,7 @@ import fr.jfp.ByteBufferOut.StraightByteArrayOutputStream;
 
 public class MsgData extends MsgFileCmd {
 	
-	/** <p>The chunk data.</p>
-	 * <p>When the message is <em>sent</em>, the content is the original data when no compression
-	 * was requested, or the deflated data when the {@code deflate} parameter is {@code > 0}.<br/>
-	 * When the message is <em>received</em>, the content is always the original data (i.e. it is
-	 * deflated during deserialization).</p> */
+	/** The chunk data, which is supposed to be compressed as per the value of {@link #deflate}. */
 	protected byte[] data;
 	
 	/** Valid number of bytes in {@link #data}. */
@@ -88,8 +85,6 @@ public class MsgData extends MsgFileCmd {
 			data = new byte[len];
 			dis.readFully(data);
 		}
-		if (deflate > 0)
-			data = inflate(data);
 	}
 	
 	/**
@@ -109,7 +104,7 @@ public class MsgData extends MsgFileCmd {
 				bos.write(buf, 0, n);
 			defl.end();
 			defl = null;
-			return bos.toByteArray();
+			return Arrays.copyOf(bos.toByteArray(), bos.size());
 		} catch (IOException e) { // Never happens with ByteArrayOutputStream
 			e.printStackTrace();
 			return null;
@@ -126,11 +121,11 @@ public class MsgData extends MsgFileCmd {
 		Inflater infl = new Inflater();
 		infl.setInput(source);
 		byte[] buf = new byte[1024];
-		try (StraightByteArrayOutputStream bos = new StraightByteArrayOutputStream(1024)) {
+		try (StraightByteArrayOutputStream bos = new StraightByteArrayOutputStream(buf.length)) {
 			int n;
 			while ((n = infl.inflate(buf)) > 0)
 				bos.write(buf, 0, n);
-			return bos.toByteArray();
+			return Arrays.copyOf(bos.toByteArray(), bos.size());
 		} catch (DataFormatException e) {
 			throw new IOException("Cannot inflate data: "+e.getMessage(), e);
 		} finally {

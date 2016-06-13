@@ -6,11 +6,13 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.Arrays;
 import java.util.Date;
 
 import fr.jfp.RemoteFile;
 import fr.jfp.client.JFPClient;
 import fr.jfp.client.JFPClientCLI;
+import fr.jfp.msg.MsgData;
 import fr.jfp.msg.file.MsgReplyFileInfos;
 import fr.jfp.server.JFPServer;
 
@@ -137,12 +139,31 @@ public class Test {
 		System.out.println();
 	}
 	
-	public static void main(String[] args) throws IOException {
+	public static void testParents() {
 		File f = File.listRoots()[0];
 		System.out.println(String.format("path [%s] parent [%s] name [%s]", f.getPath(), f.getParent(), f.getName()));
 		f = new File("D:/temp");
 		System.out.println(String.format("path [%s] parent [%s] name [%s]", f.getPath(), f.getParent(), f.getName()));
+	}
+	
+	public static void testDeflate() {
+		byte[] in = new byte[1500];
+		for (int i=0;i<in.length;i++)in[i]=(byte)i;
+		byte[] out = MsgData.deflate(in, 9);
+		System.out.println("Before "+in.length+", after "+out.length);
+		try {
+			out = MsgData.inflate(out);
+			System.out.println("Back "+out.length+", equals "+Arrays.equals(in, out));
+		} catch (IOException e) {
+			Throwable t = e.getCause();
+			System.err.println(t.getClass()+" - "+t.getMessage());
+		}
+	}
+	
+	public static void main(String[] args) throws IOException {
 //		test();
+		testDeflate();
+//		testParents();
 //		testEscape();
 //		testNBSok();
 	}

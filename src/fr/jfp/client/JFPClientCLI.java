@@ -27,6 +27,9 @@ public class JFPClientCLI implements Runnable {
 	private File local;
 	private RemoteFile remote;
 	
+	private int deflate = 0;
+	private int mtu = 8192;
+	
 	public JFPClientCLI(JFPClient cli) {
 		this.cli = cli;
 		local = new File(System.getProperty("user.dir"));
@@ -284,7 +287,7 @@ public class JFPClientCLI implements Runnable {
 //							}
 //						}
 //						t0 = System.currentTimeMillis() - t0;
-						len = cli.getFile(rem, 0, arg1);
+						len = cli.getFile(rem, deflate, arg1, 1500); // TODO: MTU
 						t0 = System.currentTimeMillis() - t0;
 						System.out.println(String.format("Copied %d bytes in %.1f s (%.1f kB/s)", len, t0 / 1000.0f, (len/1024.0f*1000.0f/t0)));
 					} catch (IOException e) {
@@ -298,8 +301,38 @@ public class JFPClientCLI implements Runnable {
 					break;
 					
 				case "opt":
-					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
-					// TODO:
+					arg1 = (cmds.length > 1 ? cmds[1] : sc.next()).toLowerCase();
+					switch (arg1) {
+						case "z":
+							if (cmds.length > 2) {
+								try {
+									deflate = Integer.parseInt(cmds[2]);
+									if (deflate <= 0)
+										System.out.println("Compression disabled");
+									else if (deflate > 9) {
+										deflate = 9;
+										System.out.println("Compression set to maximum 9");
+									} else
+										System.out.println("Compression set to "+deflate);
+								} catch (NumberFormatException e) {
+									System.out.println(cmds[2]+" is not a valid compression value.");
+								}
+							} else
+								System.out.println("Compression set to "+(deflate > 0 ? ""+deflate : "disabled"));
+							break;
+						
+						case "mtu":
+							if (cmds.length > 2) {
+								try {
+									mtu = Integer.parseInt(cmds[2]);
+									System.out.println("MTU set to "+mtu);
+								} catch (NumberFormatException e) {
+									System.out.println(cmds[2]+" is not a valid MTU value.");
+								}
+							} else
+								System.out.println("MTU set to "+mtu);
+							break;
+					}
 					break;
 					
 				case "bye":
@@ -329,7 +362,8 @@ public class JFPClientCLI implements Runnable {
 		System.out.println("GET <remote file> [local file] - Retrieve remote file");
 		System.out.println("PUT <local file> [remote file] - Send a local file");
 		System.out.println("OPT <option> [value]           - Set or retrieve an option value:");
-		System.out.println("    Z [true|false]                 - Set deflate compression");
+		System.out.println("    Z   [0..9]                     - Set deflate compression (0:none, 9:max)");
+		System.out.println("    MTU [value]                    - Set network MTU");
 	}
 	
 }

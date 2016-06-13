@@ -286,22 +286,23 @@ public class JFPProvider extends Thread {
 		execGet.execute(new Runnable() {
 			@Override
 			public void run() {
-				byte[] buf = new byte[8192];
+				byte[] bufIn = new byte[m.getMTU()];
+				byte[] bufOut = bufIn;
 				String name = m.getFilename();
 				Thread.currentThread().setName("GET "+name);
 				short replyTo = m.getNum();
 				int deflate = m.getDeflate();
 				long len = new File(name).length();
-				try (InputStream is = new BufferedInputStream(new FileInputStream(name), 2*buf.length)) {
+				try (InputStream is = new BufferedInputStream(new FileInputStream(name), 2*bufIn.length)) {
 					int n;
 					while (len > 0) {
-						n = read(is, buf);
+						n = read(is, bufIn);
 						len -= n;
 						if (deflate > 0) {
-							buf = MsgData.deflate(buf, deflate);
-							n = buf.length;
+							bufOut = MsgData.deflate(bufIn, deflate);
+							n = bufOut.length; // TODO: Read until MTU bytes available after compression
 						}
-						new MsgData(replyTo, (short)-1, buf, n, deflate, len > 0).send(sok);
+						new MsgData(replyTo, (short)-1, bufOut, n, deflate, len > 0).send(sok);
 					}
 				} catch (IOException ex) {
 					try {

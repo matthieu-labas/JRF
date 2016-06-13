@@ -19,15 +19,19 @@ public class MsgGet extends Message {
 	/** The requested deflate level for chunk transfer. No deflate requested when {@code <= 0}. */
 	protected int deflate;
 	
+	/** The chunk size when sending file. */
+	protected int mtu;
+	
 	// Mandatory no-arg constructor
 	public MsgGet() {
 		super();
 	}
 	
-	public MsgGet(String file, int deflate) {
+	public MsgGet(String file, int deflate, int mtu) {
 		super();
 		this.file = file;
 		this.deflate = deflate;
+		this.mtu = mtu;
 	}
 	
 	public String getFilename() {
@@ -38,11 +42,16 @@ public class MsgGet extends Message {
 		return deflate;
 	}
 	
+	public int getMTU() {
+		return mtu;
+	}
+	
 	@Override
 	protected ByteBufferOut encode() throws IOException {
 		ByteBufferOut bb = new ByteBufferOut(8+2*file.length()); // Should be enough
 		bb.writeString(file);
 		bb.writeByte(deflate);
+		bb.writeShort(mtu);
 		return bb;
 	}
 	
@@ -51,6 +60,7 @@ public class MsgGet extends Message {
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
 			file = readString(dis);
 			deflate = dis.readByte();
+			mtu = dis.readShort() & 0xffff;
 		}
 	}
 	
