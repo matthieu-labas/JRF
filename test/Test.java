@@ -149,10 +149,10 @@ public class Test {
 	public static void testDeflate() {
 		byte[] in = new byte[1500];
 		for (int i=0;i<in.length;i++)in[i]=(byte)i;
-		byte[] out = MsgData.deflate(in, 9);
+		byte[] out = MsgData.deflate(in, in.length, 9);
 		System.out.println("Before "+in.length+", after "+out.length);
 		try {
-			out = MsgData.inflate(out);
+			out = MsgData.inflate(out, out.length);
 			System.out.println("Back "+out.length+", equals "+Arrays.equals(in, out));
 		} catch (IOException e) {
 			Throwable t = e.getCause();

@@ -289,7 +289,7 @@ public class JFPClient extends Thread {
 				MsgData msg = (MsgData)m;
 				buf = msg.getData();
 				if (msg.getDeflate() > 0)
-					buf = MsgData.inflate(buf);
+					buf = MsgData.inflate(buf, buf.length);
 				os.write(buf);
 				len += buf.length;
 				if (!msg.hasNext())

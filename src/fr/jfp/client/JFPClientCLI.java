@@ -127,7 +127,7 @@ public class JFPClientCLI implements Runnable {
 					try{Thread.sleep(100);}catch(InterruptedException e){}
 				}
 			} catch (IOException e) { }
-			String c = sc.next();
+			String c = sc.nextLine();
 			String[] cmds = splitCommand(c);
 			String arg1, arg2; 
 			switch (cmds[0].toLowerCase()) {
@@ -268,6 +268,10 @@ public class JFPClientCLI implements Runnable {
 					break;
 					
 				case "get":
+					if (remote == null) {
+						System.out.println("No remote directory selected.");
+						break;
+					}
 					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
 					String rem = remote.getPath()+"/"+arg1;
 					try {

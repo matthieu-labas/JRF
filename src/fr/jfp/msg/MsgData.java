@@ -93,9 +93,9 @@ public class MsgData extends MsgFileCmd {
 	 * @param level The compression level (0-9).
 	 * @return The compressed array.
 	 */
-	public static byte[] deflate(byte[] source, int level) {
+	public static byte[] deflate(byte[] source, int len, int level) {
 		Deflater defl = new Deflater(level);
-		defl.setInput(source);
+		defl.setInput(source, 0, len);
 		defl.finish();
 		byte[] buf = new byte[1024];
 		try (StraightByteArrayOutputStream bos = new StraightByteArrayOutputStream(1024)) {
@@ -117,9 +117,9 @@ public class MsgData extends MsgFileCmd {
 	 * @return The decompressed byte array.
 	 * @throws IOException If input array contains invalid data.
 	 */
-	public static byte[] inflate(byte[] source) throws IOException {
+	public static byte[] inflate(byte[] source, int len) throws IOException {
 		Inflater infl = new Inflater();
-		infl.setInput(source);
+		infl.setInput(source, 0, len);
 		byte[] buf = new byte[1024];
 		try (StraightByteArrayOutputStream bos = new StraightByteArrayOutputStream(buf.length)) {
 			int n;

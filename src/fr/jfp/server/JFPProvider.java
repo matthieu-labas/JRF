@@ -299,7 +299,7 @@ public class JFPProvider extends Thread {
 						n = read(is, bufIn);
 						len -= n;
 						if (deflate > 0) {
-							bufOut = MsgData.deflate(bufIn, deflate);
+							bufOut = MsgData.deflate(bufIn, n, deflate);
 							n = bufOut.length; // TODO: Read until MTU bytes available after compression
 						}
 						new MsgData(replyTo, (short)-1, bufOut, n, deflate, len > 0).send(sok);
