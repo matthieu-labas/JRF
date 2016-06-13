@@ -1,5 +1,6 @@
 package fr.jfp.server;
 
+import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,8 +31,8 @@ import fr.jfp.msg.MsgSkip;
 import fr.jfp.msg.file.MsgFile;
 import fr.jfp.msg.file.MsgFileDelete;
 import fr.jfp.msg.file.MsgFileInfos;
-import fr.jfp.msg.file.MsgFileIs;
 import fr.jfp.msg.file.MsgFileList;
+import fr.jfp.msg.file.MsgFileMkdirs;
 import fr.jfp.msg.file.MsgFileRoots;
 import fr.jfp.msg.file.MsgFileSpace;
 import fr.jfp.msg.file.MsgReplyFileInfos;
@@ -243,21 +244,14 @@ public class JFPProvider extends Thread {
 	private void handleFileOp(MsgFile msg) throws IOException {
 		log.info(getName()+": Request FileOp "+msg);
 		
-		if (msg instanceof MsgFileIs) {
-			MsgFileIs m = (MsgFileIs)msg;
-			boolean is = false;
-			switch (m.isType()) {
-				case IS_EXIST: is = m.getFile().exists(); break;
-				case IS_FILE: is = m.getFile().isFile(); break;
-				case IS_DIRECTORY: is = m.getFile().isDirectory(); break;
-			}
-			new MsgReplyFileLong(m.getNum(), is ? 1l : 0l).send(sok);
-		
-		} else if (msg instanceof MsgFileList) {
+		if (msg instanceof MsgFileList) {
 			new MsgReplyFileList(msg.getNum(), msg.getFile().listFiles(), true).send(sok); // TODO: Split if too many files
 			
 		} else if (msg instanceof MsgFileDelete) {
 			new MsgReplyFileLong(msg.getNum(), msg.getFile().delete() ? 1l : 0l).send(sok);
+			
+		} else if (msg instanceof MsgFileMkdirs) {
+			new MsgReplyFileLong(msg.getNum(), msg.getFile().mkdirs() ? 1l : 0l).send(sok);
 			
 		} else if (msg instanceof MsgFileInfos) {
 			new MsgReplyFileInfos(msg.getNum(), msg.getFile()).send(sok);
@@ -324,10 +318,11 @@ public class JFPProvider extends Thread {
 	
 	
 	
-	private static class NamedFileInputStream extends FileInputStream {
+	private static class NamedFileInputStream extends BufferedInputStream {
 		private String name;
 		public NamedFileInputStream(String name) throws FileNotFoundException {
-			super(name);
+			super(new FileInputStream(name));
+			this.name = name;
 		}
 	}
 }

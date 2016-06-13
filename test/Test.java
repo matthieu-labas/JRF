@@ -138,8 +138,12 @@ public class Test {
 	}
 	
 	public static void main(String[] args) throws IOException {
+		File f = File.listRoots()[0];
+		System.out.println(String.format("path [%s] parent [%s] name [%s]", f.getPath(), f.getParent(), f.getName()));
+		f = new File("D:/temp");
+		System.out.println(String.format("path [%s] parent [%s] name [%s]", f.getPath(), f.getParent(), f.getName()));
 //		test();
-		testEscape();
+//		testEscape();
 //		testNBSok();
 	}
 	

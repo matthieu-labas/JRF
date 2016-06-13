@@ -129,7 +129,7 @@ public class JFPClientCLI implements Runnable {
 			} catch (IOException e) { }
 			String c = sc.next();
 			String[] cmds = splitCommand(c);
-			String arg1; 
+			String arg1, arg2; 
 			switch (cmds[0].toLowerCase()) {
 				case "cd": {
 					RemoteFile nrem;
@@ -195,7 +195,8 @@ public class JFPClientCLI implements Runnable {
 					}
 					break; }
 					
-				case "lls":
+				case "lls": {
+					SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
 					for (File f : local.listFiles()) {
 						System.out.print(f.isDirectory() ? "d" : "-");
 						System.out.print(f.canRead() ? "r" : "-");
@@ -204,20 +205,19 @@ public class JFPClientCLI implements Runnable {
 						System.out.print(' ');
 						System.out.print(f.length());
 						System.out.print(' ');
-						System.out.print(new SimpleDateFormat(dateFormat).format(new Date(f.lastModified())));
+						System.out.print(sdf.format(new Date(f.lastModified())));
 						System.out.print(' ');
 						System.out.println(f.getName());
 					}
-					break;
+					} break;
 					
 				case "rm":
 					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
-					// TODO: Handle wildcards
 					try {
 						if (new RemoteFile(remote, arg1, false).delete())
 							System.out.println(arg1+" deleted.");
 						else
-							System.out.println("Could not delete "+arg1+".");
+							System.out.println("Could not delete "+arg1);
 					} catch (IOException e) { } // Does not happen with 'false' as a third argument of new RemoteFile()
 					break;
 					
@@ -226,18 +226,37 @@ public class JFPClientCLI implements Runnable {
 					if (new File(local, arg1).delete())
 						System.out.println(arg1+" deleted.");
 					else
-						System.out.println("Could not delete "+arg1+".");
+						System.out.println("Could not delete "+arg1);
+					break;
+					
+				case "mv":
+					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
+					arg2 = (cmds.length > 2 ? cmds[2] : sc.next());
+					try {
+						if (new RemoteFile(remote, arg1, false).renameTo(new RemoteFile(remote, arg2, false)))
+							System.out.println(arg1+" renamed to "+arg2);
+						else
+							System.out.println("Could not rename "+arg1+" to "+arg2);
+					} catch (IOException e) { } // Does not happen with 'false' as a third argument of new RemoteFile()
+					break;
+					
+				case "lmv":
+					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
+					arg2 = (cmds.length > 2 ? cmds[2] : sc.next());
+					if (new File(arg1).renameTo(new File(arg2)))
+						System.out.println(arg1+" renamed to "+arg2);
+					else
+						System.out.println("Could not rename "+arg1+" to "+arg2);
 					break;
 					
 				case "md":
-					// TODO:
-//					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
-//					try {
-//						if (new RemoteFile(remote, arg1, false).mkdirs())
-//							System.out.println(arg1+" created.");
-//						else
-//							System.out.println("Could not create "+arg1+".");
-//					} catch (IOException e) { } // Does not happen with 'false' as a third argument of new RemoteFile()
+					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
+					try {
+						if (new RemoteFile(remote, arg1, false).mkdirs())
+							System.out.println(arg1+" created.");
+						else
+							System.out.println("Could not create "+arg1+".");
+					} catch (IOException e) { } // Does not happen with 'false' as a third argument of new RemoteFile()
 					break;
 					
 				case "lmd":
@@ -298,14 +317,16 @@ public class JFPClientCLI implements Runnable {
 	
 	public static void printHelp() {
 		System.out.println("Commands:");
-		System.out.println("LS  - List remote files");
-		System.out.println("LLS - List local files");
+		System.out.println("LS                             - List remote files");
+		System.out.println("LLS                            - List local files");
 		System.out.println("CD  <remote directory>         - Change remote directory");
 		System.out.println("LCD <local directory>          - Change local directory");
-		System.out.println("RM  <remote file>              - Delete remote file");
-		System.out.println("LRM  <local file>              - Delete local file");
 		System.out.println("MD  <remote directory>         - Create remote directories");
-		System.out.println("LMD  <local directories>       - Create local directories");
+		System.out.println("LMD <local directories>        - Create local directories");
+		System.out.println("RM  <remote file>              - Delete remote file");
+		System.out.println("LRM <local file>               - Delete local file");
+		System.out.println("MV  <remote file> <new name>   - Rename/Move remote file");
+		System.out.println("LMV <local file> <new name>    - Rename/Move remote file");
 		System.out.println("GET <remote file> [local file] - Retrieve remote file");
 		System.out.println("PUT <local file> [remote file] - Send a local file");
 		System.out.println("OPT <option> [value]           - Set or retrieve an option value:");

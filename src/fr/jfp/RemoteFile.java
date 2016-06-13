@@ -8,6 +8,7 @@ import fr.jfp.msg.Message;
 import fr.jfp.msg.file.MsgFileDelete;
 import fr.jfp.msg.file.MsgFileInfos;
 import fr.jfp.msg.file.MsgFileList;
+import fr.jfp.msg.file.MsgFileMkdirs;
 import fr.jfp.msg.file.MsgFileRoots;
 import fr.jfp.msg.file.MsgFileSpace;
 import fr.jfp.msg.file.MsgFileSpace.SpaceType;
@@ -57,7 +58,6 @@ public class RemoteFile extends File {
 		// TODO: Override
 //		super.list(filter);
 		
-//		super.mkdirs();
 //		super.renameTo(dest);
 //		super.createNewFile();
 	}
@@ -216,6 +216,11 @@ public class RemoteFile extends File {
 	@Override
 	public boolean delete() {
 		return (getLong(new MsgFileDelete(pathname)) != 0l);
+	}
+	
+	@Override
+	public boolean mkdirs() {
+		return (getLong(new MsgFileMkdirs(pathname)) != 0l);
 	}
 	
 	@Override
