@@ -1,10 +1,7 @@
 package fr.jfp.client;
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -271,21 +268,23 @@ public class JFPClientCLI implements Runnable {
 					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
 					String rem = remote.getPath()+"/"+arg1;
 					try {
-						long len = new RemoteFile(cli, rem).length(); // Remote file length
-						long t0 = 0l;
-						try (FileOutputStream fos = new FileOutputStream(new File(local, new File(arg1).getName()))) {
-							byte[] buf = new byte[1500]; // TODO: MTU
-							t0 = System.currentTimeMillis();
-							try (InputStream is = new BufferedInputStream(cli.getRemoteInputStream(rem), buf.length)) {
-								int n;
-								for (;;) {
-									n = is.read(buf);
-									if (n < 0) // EOF
-										break;
-									fos.write(buf, 0, n);
-								}
-							}
-						}
+						long t0 = System.currentTimeMillis();
+						long len = 0;
+//						try (FileOutputStream fos = new FileOutputStream(new File(local, new File(arg1).getName()))) {
+//							byte[] buf = new byte[1500]; // TODO: MTU
+//							try (InputStream is = new BufferedInputStream(cli.getRemoteInputStream(rem), 2*buf.length)) {
+//								int n;
+//								for (;;) {
+//									n = is.read(buf);
+//									if (n < 0) // EOF
+//										break;
+//									len += n;
+//									fos.write(buf, 0, n);
+//								}
+//							}
+//						}
+//						t0 = System.currentTimeMillis() - t0;
+						len = cli.getFile(rem, 0, arg1);
 						t0 = System.currentTimeMillis() - t0;
 						System.out.println(String.format("Copied %d bytes in %.1f s (%.1f kB/s)", len, t0 / 1000.0f, (len/1024.0f*1000.0f/t0)));
 					} catch (IOException e) {

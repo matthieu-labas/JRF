@@ -27,6 +27,9 @@ public class MsgData extends MsgFileCmd {
 	 * logging. */
 	protected int deflate;
 	
+	/** {@code false} if this is the last reply data message. */
+	protected boolean hasNext;
+	
 	// Mandatory no-arg constructor
 	public MsgData() {
 		super((short)-1);
@@ -38,16 +41,14 @@ public class MsgData extends MsgFileCmd {
 	 * @param replyTo The message number asking for data.
 	 * @param fileID The file {@code data} belongs to.
 	 * @param data The chunk data.
-	 * @param deflate If {@code > 0}, {@code data} will be deflated before being stored.
+	 * @param deflate If {@code > 0}, {@code data} should be considered deflated.
 	 */
-	public MsgData(short replyTo, short fileID, byte[] data, int len, int deflate) {
+	public MsgData(short replyTo, short fileID, byte[] data, int len, int deflate, boolean hasNext) {
 		super(replyTo, fileID);
+		this.hasNext = hasNext;
 		this.deflate = deflate;
 		this.len = len;
-		if (deflate > 0)
-			this.data = deflate(data, deflate);
-		else
-			this.data = data;
+		this.data = data;
 	}
 	
 	public byte[] getData() {
@@ -62,10 +63,15 @@ public class MsgData extends MsgFileCmd {
 		return deflate;
 	}
 	
+	public boolean hasNext() {
+		return hasNext;
+	}
+	
 	@Override
 	protected ByteBufferOut encode() throws IOException {
 		ByteBufferOut bb = new ByteBufferOut(8+len);
 		bb.writeShort(fileID);
+		bb.writeByte(hasNext?1:0);
 		bb.writeByte(deflate); // Between 0 and 9
 		bb.writeInt(len);
 		bb.write(data, 0, len);
@@ -74,9 +80,9 @@ public class MsgData extends MsgFileCmd {
 	
 	@Override
 	protected void decode(byte[] buf) throws IOException {
-		len = buf.length - 8; // 8 being the two int 'fileID' and 'deflate'
 		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buf))) {
 			fileID = dis.readShort();
+			hasNext = (dis.readByte() != 0);
 			deflate = dis.readByte();
 			len = dis.readInt();
 			data = new byte[len];
@@ -86,6 +92,12 @@ public class MsgData extends MsgFileCmd {
 			data = inflate(data);
 	}
 	
+	/**
+	 * Utility method to compress a byte array.
+	 * @param source The array to compress.
+	 * @param level The compression level (0-9).
+	 * @return The compressed array.
+	 */
 	public static byte[] deflate(byte[] source, int level) {
 		Deflater defl = new Deflater(level);
 		defl.setInput(source);
@@ -104,6 +116,12 @@ public class MsgData extends MsgFileCmd {
 		}
 	}
 	
+	/**
+	 * Utility method to decompress a compressed byte array.
+	 * @param source The compressed array.
+	 * @return The decompressed byte array.
+	 * @throws IOException If input array contains invalid data.
+	 */
 	public static byte[] inflate(byte[] source) throws IOException {
 		Inflater infl = new Inflater();
 		infl.setInput(source);

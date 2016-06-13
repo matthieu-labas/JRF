@@ -1,8 +1,11 @@
 package fr.jfp.client;
 
+import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
@@ -18,7 +21,9 @@ import fr.jfp.RemoteInputStream;
 import fr.jfp.msg.Message;
 import fr.jfp.msg.MsgAck;
 import fr.jfp.msg.MsgClose;
+import fr.jfp.msg.MsgData;
 import fr.jfp.msg.MsgFileCmd;
+import fr.jfp.msg.MsgGet;
 import fr.jfp.msg.MsgOpen;
 import fr.jfp.server.JFPProvider;
 import fr.jfp.server.JFPServer;
@@ -260,6 +265,38 @@ public class JFPClient extends Thread {
 				log.warning(Thread.currentThread().getName()+": Exception while closing "+sok+": "+e.getMessage());
 			}
 		}
+	}
+	
+	/**
+	 * Retrieve a remote file.
+	 * @param remote The remote file path.
+	 * @param deflate The deflate value to apply remotely on the data.
+	 * @param local The local file to write to.
+	 * @throws IOException
+	 */
+	public long getFile(String remote, int deflate, String local) throws IOException {
+		short num = new MsgGet(remote, deflate).send(sok);
+		long len = 0l;
+		try (OutputStream os = new BufferedOutputStream(new FileOutputStream(local))) {
+			Message m;
+			byte[] buf;
+			for (;;) {
+				m = getReply(num, 0); // Wait for MsgAck to get file ID
+				if (m instanceof MsgAck) // Exception
+					throw new IOException(((MsgAck)m).getMessage());
+				if (!(m instanceof MsgData)) // Unknown message
+					throw new IOException("Unexpected message during file GET: "+m);
+				MsgData msg = (MsgData)m;
+				buf = msg.getData();
+				if (msg.getDeflate() > 0)
+					buf = MsgData.inflate(buf);
+				os.write(buf);
+				len += buf.length;
+				if (!msg.hasNext())
+					break;
+			}
+		}
+		return len;
 	}
 	
 	@Override

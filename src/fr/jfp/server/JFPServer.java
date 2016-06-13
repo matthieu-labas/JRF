@@ -169,8 +169,7 @@ public class JFPServer extends Thread {
 			System.out.print("$ ");
 			String c = sc.next().toLowerCase();
 			switch (c) {
-				case "q":
-				case "x":
+				case "bye":
 					System.out.print("\nDo you want to exit (y/N)? ");
 					c = sc.next();
 					if ("y".equalsIgnoreCase(c)) {
@@ -197,8 +196,8 @@ public class JFPServer extends Thread {
 				
 				default:
 					System.out.println("Commands:");
-					System.out.println("X|Q - Exit");
-					System.out.println("? - Show connected clients and opened files");
+					System.out.println("BYE - Exit");
+					System.out.println("?   - Show connected clients and opened files");
 					break;
 			}
 		}

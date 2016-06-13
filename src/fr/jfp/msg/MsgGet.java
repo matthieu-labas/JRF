@@ -7,13 +7,11 @@ import java.io.IOException;
 import fr.jfp.ByteBufferOut;
 
 /**
- * <p>Open file request.</p>
- * <p>The {@link #file} is an absolute path, as seen by the Server. An optional {@link #deflate} level
- * can be specified to activate in-place deflate when transferring file chunks.</p>
+ * Special message to request a complete file, potentially deflated.
  * 
  * @author Matthieu Labas
  */
-public class MsgOpen extends Message {
+public class MsgGet extends Message {
 	
 	/** The file name to open. */
 	protected String file;
@@ -22,17 +20,17 @@ public class MsgOpen extends Message {
 	protected int deflate;
 	
 	// Mandatory no-arg constructor
-	MsgOpen() {
+	public MsgGet() {
 		super();
 	}
 	
-	public MsgOpen(String file, int deflate) {
+	public MsgGet(String file, int deflate) {
 		super();
 		this.file = file;
 		this.deflate = deflate;
 	}
 	
-	public String getFile() {
+	public String getFilename() {
 		return file;
 	}
 	

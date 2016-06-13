@@ -15,6 +15,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -25,6 +28,7 @@ import fr.jfp.msg.Message;
 import fr.jfp.msg.MsgAck;
 import fr.jfp.msg.MsgClose;
 import fr.jfp.msg.MsgData;
+import fr.jfp.msg.MsgGet;
 import fr.jfp.msg.MsgOpen;
 import fr.jfp.msg.MsgRead;
 import fr.jfp.msg.MsgSkip;
@@ -59,6 +63,9 @@ public class JFPProvider extends Thread {
 	
 	/** Map of locally open files. Key is the file ID. */
 	private Map<Short,NamedFileInputStream> localOpened;
+	
+	/** Executor used to send files requested through {@link MsgGet} commands. */
+	private ExecutorService execGet;
 	
 	private volatile boolean goOn;
 	
@@ -123,6 +130,15 @@ public class JFPProvider extends Thread {
 		
 		// Close the connection
 		JFPClient.gracefulClose(sok, true);
+		if (execGet != null) {
+			execGet.shutdown();
+			for (;;) {
+				try {
+					if (execGet.awaitTermination(1, TimeUnit.SECONDS))
+						break;
+				} catch (InterruptedException e) { }
+			}
+		}
 		srv.providerClosed(this);
 	}
 	
@@ -205,7 +221,7 @@ public class JFPProvider extends Thread {
 						break;
 					n += r;
 				}
-				data = new MsgData(num, fileID, buf, n, 0); // TODO: Handle deflate
+				data = new MsgData(num, fileID, buf, n, 0, false); // TODO: Handle deflate
 				log.fine(getName()+": read "+n+" bytes from file "+fileID);
 			} catch (IOException e) { // Exception during read
 				String msg = e.getMessage();
@@ -239,6 +255,63 @@ public class JFPProvider extends Thread {
 				log.warning(getName()+": Error when closing file ID "+fileID+": "+e.getMessage());
 			}
 		}
+	}
+	
+	/**
+	 * Reads every possible byte into the given array, returning the number of bytes actually read,
+	 * which can be {@code < buf.length} if EOF has been reached on {@code is}.
+	 * @param is The {@code InputStream} to read.
+	 * @param buf The buffer to fill with data read from {@code is}.
+	 * @return The number of bytes read (up to {@code buf.length}.
+	 * @throws IOException
+	 */
+	private static int read(InputStream is, byte[] buf) throws IOException {
+		int n;
+		int len = buf.length, tot = 0;
+		while (len > 0) {
+			n = is.read(buf, tot, len);
+			if (n < 0)
+				break;
+			tot += n;
+			len -= n;
+		}
+		return tot;
+	}
+	
+	// "File get" command
+	private void handleFileGet(final MsgGet m) throws IOException {
+		log.info(getName()+": Request get file "+m.getFilename());
+		if (execGet == null)
+			execGet = Executors.newSingleThreadExecutor();
+		execGet.execute(new Runnable() {
+			@Override
+			public void run() {
+				byte[] buf = new byte[8192];
+				String name = m.getFilename();
+				Thread.currentThread().setName("GET "+name);
+				short replyTo = m.getNum();
+				int deflate = m.getDeflate();
+				long len = new File(name).length();
+				try (InputStream is = new BufferedInputStream(new FileInputStream(name), 2*buf.length)) {
+					int n;
+					while (len > 0) {
+						n = read(is, buf);
+						len -= n;
+						if (deflate > 0) {
+							buf = MsgData.deflate(buf, deflate);
+							n = buf.length;
+						}
+						new MsgData(replyTo, (short)-1, buf, n, deflate, len > 0).send(sok);
+					}
+				} catch (IOException ex) {
+					try {
+						new MsgAck(m.getReplyTo(), (short)-1, MsgAck.ERR, ex.getMessage()).send(sok);
+					} catch (IOException e) {
+						log.severe("I/O error when sending I/O error report on file GET "+name);
+					}
+				}
+			}
+		});
 	}
 	
 	private void handleFileOp(MsgFile msg) throws IOException {
@@ -295,6 +368,8 @@ public class JFPProvider extends Thread {
 					handleClose((MsgClose)msg);
 				} else if (msg instanceof MsgFile) { // Operation on java.io.File
 					handleFileOp((MsgFile)msg);
+				} else if (msg instanceof MsgGet) { // Request file content
+					handleFileGet((MsgGet)msg);
 				} else { // Unknown
 					log.warning(getName()+": Don't know how to handle file message "+msg);
 				}

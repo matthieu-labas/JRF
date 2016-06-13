@@ -11,7 +11,6 @@ package fr.jfp.msg;
  */
 public abstract class MsgFileCmd extends Message {
 	
-	/** The file ID to close. */
 	protected short fileID;
 	
 	public MsgFileCmd(short replyTo, short fileID) {
