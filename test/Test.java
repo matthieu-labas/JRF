@@ -9,12 +9,12 @@ import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.Date;
 
-import fr.jfp.RemoteFile;
-import fr.jfp.client.JFPClient;
-import fr.jfp.client.JFPClientCLI;
-import fr.jfp.msg.MsgData;
-import fr.jfp.msg.file.MsgReplyFileInfos;
-import fr.jfp.server.JFPServer;
+import fr.jrf.RemoteFile;
+import fr.jrf.client.JRFClient;
+import fr.jrf.client.JRFClientCLI;
+import fr.jrf.msg.MsgData;
+import fr.jrf.msg.file.MsgReplyFileInfos;
+import fr.jrf.server.JRFServer;
 
 public class Test {
 	
@@ -36,9 +36,9 @@ public class Test {
 	}
 	
 	public static void test() throws IOException {
-		JFPServer srv = JFPServer.get(new InetSocketAddress(JFPServer.DEFAULT_PORT));
+		JRFServer srv = JRFServer.get(new InetSocketAddress(JRFServer.DEFAULT_PORT));
 		srv.start();
-		JFPClient cli = new JFPClient(new InetSocketAddress("127.0.0.1", JFPServer.DEFAULT_PORT));
+		JRFClient cli = new JRFClient(new InetSocketAddress("127.0.0.1", JRFServer.DEFAULT_PORT));
 		System.out.println("Connected.");
 		srv.requestStop();
 		cli.start();
@@ -125,16 +125,16 @@ public class Test {
 	}
 	
 	public static void testEscape() {
-		for (String s : JFPClientCLI.splitCommand("cd \"di wi sp\" \"and another\""))
+		for (String s : JRFClientCLI.splitCommand("cd \"di wi sp\" \"and another\""))
 			System.out.print("["+s+"] ");
 		System.out.println();
-		for (String s : JFPClientCLI.splitCommand("get file\\ with\\ spaces.txt"))
+		for (String s : JRFClientCLI.splitCommand("get file\\ with\\ spaces.txt"))
 			System.out.print("["+s+"] ");
 		System.out.println();
-		for (String s : JFPClientCLI.splitCommand("get file\\\"with\\\"doublequote.txt"))
+		for (String s : JRFClientCLI.splitCommand("get file\\\"with\\\"doublequote.txt"))
 			System.out.print("["+s+"] ");
 		System.out.println();
-		for (String s : JFPClientCLI.splitCommand("get \"file \\\"with\\\"\\ doublequote.txt\" and\\ another"))
+		for (String s : JRFClientCLI.splitCommand("get \"file \\\"with\\\"\\ doublequote.txt\" and\\ another"))
 			System.out.print("["+s+"] ");
 		System.out.println();
 	}
