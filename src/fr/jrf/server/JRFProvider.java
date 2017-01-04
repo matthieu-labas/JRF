@@ -2,6 +2,7 @@ package fr.jrf.server;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -121,22 +122,24 @@ public class JRFProvider extends Thread {
 	 * @return The list of currently opened input files.
 	 */
 	public List<String> getOpenedInputFiles() {
-		// Could be synchronized...
-		List<String> opnd = new ArrayList<>(localIS.size());
-		for (NamedFileInputStream is : localIS.values())
-			opnd.add(is.getOptions().getFile());
-		return opnd;
+		synchronized (localIS) {
+			List<String> opnd = new ArrayList<>(localIS.size());
+			for (NamedFileInputStream is : localIS.values())
+				opnd.add(is.name);
+			return opnd;
+		}
 	}
 	
 	/**
 	 * @return The list of currently opened output files.
 	 */
 	public List<String> getOpenedOutputFiles() {
-		// Could be synchronized...
-		List<String> opnd = new ArrayList<>(localOS.size());
-		for (NamedFileOutputStream is : localOS.values())
-			opnd.add(is.getOptions().getFile());
-		return opnd;
+		synchronized (localOS) {
+			List<String> opnd = new ArrayList<>(localOS.size());
+			for (NamedFileOutputStream os : localOS.values())
+				opnd.add(os.name);
+			return opnd;
+		}
 	}
 	
 	/**
@@ -149,18 +152,22 @@ public class JRFProvider extends Thread {
 	
 	private synchronized void close() {
 		// Close all locally opened files
-		for (InputStream is : localIS.values()) {
-			try {
-				is.close();
-			} catch (IOException e) {
-				log.warning(getName()+": Exception while closing local file "+is+": "+e.getMessage());
+		synchronized (localIS) {
+			for (InputStream is : localIS.values()) {
+				try {
+					is.close();
+				} catch (IOException e) {
+					log.warning(getName()+": Exception while closing local file "+is+": "+e.getMessage());
+				}
 			}
 		}
-		for (OutputStream os : localOS.values()) {
-			try {
-				os.close();
-			} catch (IOException e) {
-				log.warning(getName()+": Exception while closing local file "+os+": "+e.getMessage());
+		synchronized (localOS) {
+			for (OutputStream os : localOS.values()) {
+				try {
+					os.close();
+				} catch (IOException e) {
+					log.warning(getName()+": Exception while closing local file "+os+": "+e.getMessage());
+				}
 			}
 		}
 		
@@ -197,21 +204,25 @@ public class JRFProvider extends Thread {
 			char mode = m.getMode();
 			switch (mode) {
 				case 'w': {
-					NamedFileOutputStream os = new NamedFileOutputStream(m);
+					NamedFileOutputStream os = new NamedFileOutputStream(m.getFile());
 					ack = new MsgAck(num, (short)(fileCounter.incrementAndGet() & 0xffff));
-					localOS.put(ack.getFileID(), os);
+					synchronized (localOS) {
+						localOS.put(ack.getFileID(), os);
+					}
 					break; }
 				
 				default:
 					log.warning("Unhandled mode '"+mode+"', assuming 'r'");
 				case 'r': {
-					NamedFileInputStream is = new NamedFileInputStream(m);
+					NamedFileInputStream is = new NamedFileInputStream(m.getFile(), m.getDeflate());
 					ack = new MsgAck(num, (short)(fileCounter.incrementAndGet() & 0xffff));
-					localIS.put(ack.getFileID(), is);
+					synchronized (localIS) {
+						localIS.put(ack.getFileID(), is);
+					}
 					break; }
 			}
 			log.fine(getName()+": "+file+"["+mode+"] > ID "+ack.getFileID());
-		} catch (IOException | SecurityException e) {
+		} catch (IOException e) {
 			log.warning(getName()+": "+file+": "+e.getClass().getSimpleName()+" - "+e.getMessage());
 			ack = new MsgAck(num, (short)-1, MsgAck.WARN, e.getMessage());
 		}
@@ -231,7 +242,10 @@ public class JRFProvider extends Thread {
 		log.info(getName()+": Request read "+len+" bytes from file "+fileID);
 		MsgAck ack = null;
 		MsgData data = null;
-		NamedFileInputStream is = localIS.get(fileID);
+		NamedFileInputStream is;
+		synchronized (localIS) {
+			is = localIS.get(fileID);
+		}
 		if (is == null) { // File descriptor not found
 			log.warning(getName()+": Local file ID "+fileID+" not found");
 			ack = new MsgAck(num, fileID, MsgAck.WARN, "File not found");
@@ -245,12 +259,11 @@ public class JRFProvider extends Thread {
 						break;
 					n += r;
 				}
-				int defl = is.getOptions().getDeflate();
-				if (defl > 0) {
-					buf = MsgData.deflate(buf, n, defl);
+				if (is.deflate > 0) {
+					buf = MsgData.deflate(buf, 0, n, is.deflate);
 					n = buf.length;
 				}
-				data = new MsgData(num, fileID, buf, n, defl, false);
+				data = new MsgData(num, fileID, buf, n, is.deflate, false);
 				log.fine(getName()+": read "+n+" bytes from file "+fileID);
 			} catch (IOException e) { // Exception during read
 				String msg = e.getMessage();
@@ -276,14 +289,19 @@ public class JRFProvider extends Thread {
 		int len = m.getLength();
 		log.info(getName()+": Request write "+len+" bytes to file "+fileID);
 		MsgAck ack = null;
-		NamedFileOutputStream os = localOS.get(fileID);
+		NamedFileOutputStream os;
+		synchronized (localOS) {
+			os = localOS.get(fileID);
+		}
 		if (os == null) { // File descriptor not found
 			log.warning(getName()+": Local file ID "+fileID+" not found");
 			ack = new MsgAck(num, fileID, MsgAck.WARN, "File not found");
 		} else {
 			byte[] buf = m.getBuffer();
-			if (os.getOptions().getDeflate() > 0)
+			if (m.getDeflate() > 0) {
 				buf = MsgData.inflate(buf, len);
+				len = buf.length;
+			}
 			try {
 				os.write(buf, 0, len);
 				log.fine(getName()+": wrote "+len+" to file "+fileID);
@@ -309,7 +327,10 @@ public class JRFProvider extends Thread {
 		long skip = m.getSkip();
 		log.info(getName()+": Request skip "+skip+" bytes on file "+fileID);
 		MsgAck ack;
-		InputStream is = localIS.get(fileID);
+		InputStream is;
+		synchronized (localIS) {
+			is = localIS.get(fileID);
+		}
 		if (is == null) { // File descriptor not found
 			log.warning(getName()+": Local file ID "+fileID+" not found");
 			ack = new MsgAck(num, fileID, MsgAck.WARN, "File not found");
@@ -335,12 +356,20 @@ public class JRFProvider extends Thread {
 	private void handleClose(MsgClose m) throws IOException {
 		int fileID = m.getFileID();
 		log.info(getName()+": Request close file "+fileID);
-		InputStream is = localIS.get(m.getFileID());
-		if (is == null) { // File descriptor not found
+		Closeable stream;
+		synchronized (localIS) {
+			stream = localIS.get(m.getFileID());
+		}
+		if (stream == null) { // Maybe an OutputStream?
+			synchronized (localOS) {
+				stream = localOS.get(m.getFileID());
+			}
+		}
+		if (stream == null) { // File descriptor not found
 			log.warning(getName()+": Local file ID "+fileID+" not found");
 		} else {
 			try {
-				is.close();
+				stream.close();
 				log.fine(getName()+": Closed file "+fileID);
 			} catch (IOException e) { // Exception during skip
 				log.warning(getName()+": Error when closing file ID "+fileID+": "+e.getMessage());
@@ -390,7 +419,7 @@ public class JRFProvider extends Thread {
 						n = read(is, bufIn);
 						len -= n;
 						if (deflate > 0) {
-							bufOut = MsgData.deflate(bufIn, n, deflate);
+							bufOut = MsgData.deflate(bufIn, 0, n, deflate);
 							n = bufOut.length; // TODO: Read until MTU bytes available after compression (see DeflateInputStream and PipedInputStream)
 						}
 						new MsgData(replyTo, (short)-1, bufOut, n, deflate, len > 0).send(sok);
@@ -543,30 +572,26 @@ public class JRFProvider extends Thread {
 	
 	
 	private static class NamedFileInputStream extends BufferedInputStream {
-		private MsgOpen opts;
-		public NamedFileInputStream(MsgOpen opts) throws FileNotFoundException, SecurityException {
-			super(new FileInputStream(opts.getFile()));
-			this.opts = opts;
-		}
-		public MsgOpen getOptions() {
-			return opts;
+		public final String name;
+		public final int deflate;
+		public NamedFileInputStream(String name, int deflate) throws FileNotFoundException {
+			super(new FileInputStream(name));
+			this.name = name;
+			this.deflate = deflate;
 		}
 		@Override public String toString() {
-			return "in:"+opts.getFile();
+			return "in:"+name;
 		}
 	}
 	
 	private static class NamedFileOutputStream extends BufferedOutputStream {
-		private MsgOpen opts;
-		public NamedFileOutputStream(MsgOpen opts) throws FileNotFoundException, SecurityException {
-			super(new FileOutputStream(opts.getFile()));
-			this.opts = opts;
-		}
-		public MsgOpen getOptions() {
-			return opts;
+		public final String name;
+		public NamedFileOutputStream(String name) throws FileNotFoundException {
+			super(new FileOutputStream(name));
+			this.name = name;
 		}
 		@Override public String toString() {
-			return "out:"+opts.getFile();
+			return "out:"+name;
 		}
 	}
 	

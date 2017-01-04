@@ -130,8 +130,13 @@ public class JRFClient extends Thread {
 		remoteIS.remove(ris.getFileID());
 	}
 	
-	public synchronized void remoteStreamClosed(RemoteOutputStream ris) {
-		remoteOS.remove(ris.getFileID());
+	/**
+	 * Called by {@code RemoteOutputStream} when its stream has been closed, so it can be removed
+	 * from {@link #remoteOS}.
+	 * @param ros The closed {@code RemoteOutputStream} to remove.
+	 */
+	public synchronized void remoteStreamClosed(RemoteOutputStream ros) {
+		remoteOS.remove(ros.getFileID());
 	}
 	
 	/** Close all remotely opened files. */
@@ -215,23 +220,22 @@ public class JRFClient extends Thread {
 		short num = new MsgOpen(remoteFile, 'w', deflate).send(sok); // Remote open file
 		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
 		addLatencyNow(t0);
-		if (m instanceof MsgAck) {
-			MsgAck msg = (MsgAck)m;
-			String err = msg.getMessage();
-			if (err != null) {
-				if (msg.getCode() == MsgAck.WARN) // File not found
-					throw new FileNotFoundException(err);
-				throw new SecurityException(err);
-			}
-			short fileID = msg.getFileID();
-			RemoteOutputStream ros = new RemoteOutputStream(remoteFile, fileID, this);
-			synchronized (this) {
-				remoteOS.put(Integer.valueOf(fileID), ros);
-			}
-			return ros;
-		} else {
+		if (!(m instanceof MsgAck))
 			throw new IOException("Unexpected message "+remoteFile);
+		
+		MsgAck msg = (MsgAck)m;
+		String err = msg.getMessage();
+		if (err != null) {
+			if (msg.getCode() == MsgAck.WARN) // File not found
+				throw new FileNotFoundException(err);
+			throw new IOException(err);
 		}
+		short fileID = msg.getFileID();
+		RemoteOutputStream ros = new RemoteOutputStream(remoteFile, fileID, deflate, this);
+		synchronized (this) {
+			remoteOS.put(Integer.valueOf(fileID), ros);
+		}
+		return ros;
 	}
 	
 	public OutputStream getRemoteOutputStream(String remoteFile) throws IOException {

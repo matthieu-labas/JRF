@@ -93,7 +93,7 @@ public class UnitTest {
 		byte[] in = new byte[1500];
 		for (int i=0;i<in.length;i++)in[i]=(byte)i;
 //		new Random().nextBytes(in); // Random will actually make deflation bigger
-		byte[] out = MsgData.deflate(in, in.length, 9);
+		byte[] out = MsgData.deflate(in, 0, in.length, 9);
 		System.out.println("Before "+in.length+", after "+out.length);
 		try {
 			out = MsgData.inflate(out, out.length);

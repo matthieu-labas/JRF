@@ -19,7 +19,7 @@ public class MsgData extends MsgFileCmd {
 	/** Valid number of bytes in {@link #data}. */
 	protected int len;
 	
-	/** The deflate level {@link #data} was deflated with, or {@code <= 0} if {@link data} is
+	/** The deflate level {@link #data} was deflated with, or {@code <= 0} if {code data} is
 	 * not deflated. N.B. that the value is not necessary for inflation but is kept for potential
 	 * logging. */
 	protected int deflate;
@@ -90,12 +90,14 @@ public class MsgData extends MsgFileCmd {
 	/**
 	 * Utility method to compress a byte array.
 	 * @param source The array to compress.
+	 * @param off The offset in {@code source}.
+	 * @param len The number of bytes to process in {@code source}.
 	 * @param level The compression level (0-9).
 	 * @return The compressed array.
 	 */
-	public static byte[] deflate(byte[] source, int len, int level) {
+	public static byte[] deflate(byte[] source, int off, int len, int level) {
 		Deflater defl = new Deflater(level);
-		defl.setInput(source, 0, len);
+		defl.setInput(source, off, len);
 		defl.finish();
 		byte[] buf = new byte[1024];
 		try (DirectByteArrayOutputStream bos = new DirectByteArrayOutputStream(1024)) {

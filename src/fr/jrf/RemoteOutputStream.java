@@ -7,6 +7,7 @@ import fr.jrf.client.JRFClient;
 import fr.jrf.msg.Message;
 import fr.jrf.msg.MsgAck;
 import fr.jrf.msg.MsgClose;
+import fr.jrf.msg.MsgData;
 import fr.jrf.msg.MsgWrite;
 import fr.jrf.server.JRFProvider;
 
@@ -17,12 +18,15 @@ public class RemoteOutputStream extends OutputStream {
 	
 	private short fileID;
 	
+	private int deflate;
+	
 	/** The client used to transfer commands to its connected {@link JRFProvider}. */
 	private JRFClient cli;
 	
-	public RemoteOutputStream(String remoteFile, short fileID, JRFClient cli) { // TODO: Deflate
+	public RemoteOutputStream(String remoteFile, short fileID, int deflate, JRFClient cli) { // TODO: Deflate
 		this.remoteFile = remoteFile;
 		this.fileID = fileID;
+		this.deflate = deflate;
 		this.cli = cli;
 	}
 	
@@ -56,8 +60,13 @@ public class RemoteOutputStream extends OutputStream {
 		
 		if (len == 0)
 			return;
+		if (deflate > 0) {
+			b = MsgData.deflate(b, off, len, deflate);
+			len = b.length;
+			// TODO: Stats on compression
+		}
 		// No latency computing for write messages because the size can be too big and bandwidth would further polute the measurement
-		short num = cli.send(new MsgWrite(fileID, b, off, len));
+		short num = cli.send(new MsgWrite(fileID, b, off, len, deflate));
 		Message msg = cli.getReply(num, 0);
 		if (!(msg instanceof MsgAck)) // Unexpected message
 			throw new IOException("Unexpected message "+msg+" ("+MsgAck.class+" was expected)");

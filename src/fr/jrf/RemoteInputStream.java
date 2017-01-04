@@ -82,6 +82,7 @@ public class RemoteInputStream extends InputStream {
 		if (m.getDeflate() > 0) {
 			data = MsgData.inflate(data, l);
 			l = data.length;
+			// TODO: Stats on compression
 		}
 		System.arraycopy(data, 0, b, off, l);
 		return (l == 0 ? -1 : l);
