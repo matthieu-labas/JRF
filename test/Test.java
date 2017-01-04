@@ -2,17 +2,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.util.Arrays;
 import java.util.Date;
 
 import fr.jrf.RemoteFile;
 import fr.jrf.client.JRFClient;
-import fr.jrf.client.JRFClientCLI;
-import fr.jrf.msg.MsgData;
 import fr.jrf.msg.file.MsgReplyFileInfos;
 import fr.jrf.server.JRFServer;
 
@@ -20,6 +13,7 @@ public class Test {
 	
 	public static void printFileInfos(File f) {
 		System.out.println("File "+f.getAbsolutePath());
+		System.out.println("Attributes    : "+(f.canRead()?"r":"-")+(f.canWrite()?"w":"-")+(f.canExecute()?"x":"-"));
 		System.out.println("Length        : "+f.length());
 		System.out.println("Last modified : "+new Date(f.lastModified()));
 		System.out.println("isFile        : "+f.isFile());
@@ -40,21 +34,28 @@ public class Test {
 		srv.start();
 		JRFClient cli = new JRFClient(new InetSocketAddress("127.0.0.1", JRFServer.DEFAULT_PORT));
 		System.out.println("Connected.");
-		srv.requestStop();
 		cli.start();
 		
 		// Read remote file
-		String remf = "D:/Temp/test.txt";
+		String remf = "/dataw/Temp/test.txt";
 		File fil = new RemoteFile(cli, remf);
 		printFileInfos(fil); // Print file meta-information
 		printFileInfos(((RemoteFile)fil).getFileInfos()); // Print file meta-information, received all-in-one
 		int len = (int)fil.length();
 		System.out.println("Remote "+remf+" is "+len+" bytes");
 		byte[] buf = new byte[len+1];
-		InputStream is = cli.getRemoteInputStream(remf);
-		int n = is.read(buf);
-		System.out.println("Read "+n+" bytes: "+new String(buf, 0, n));
-		is.close();
+		
+		// Read it (raw)
+		try (InputStream is = cli.getRemoteInputStream(remf)) {
+			int n = is.read(buf);
+			System.out.println("Read (raw) "+n+" bytes: {"+new String(buf, 0, n)+"}");
+		}
+		
+		// Read it (deflated chunks)
+		try (InputStream is = cli.getRemoteInputStream(remf, 9)) {
+			int n = is.read(buf);
+			System.out.println("Read (deflated) "+n+" bytes: {"+new String(buf, 0, n)+"}");
+		}
 		
 		// Get list of files
 		File[] roots = RemoteFile.listRoots(cli);
@@ -62,110 +63,16 @@ public class Test {
 		for (File f : roots)
 			System.out.println(String.format("%c [%20.20s] %s %d bytes", f.isDirectory() ? 'd' : 'f', f.getPath()+File.separator+f.getName(), new Date(f.lastModified()), f.length()));
 		
+		srv.requestStop();
 		cli.requestStop();
-		while (cli.isAlive())
-			try{Thread.sleep(200);}catch(InterruptedException e){}
+		try{cli.join();}catch(InterruptedException e){}
+		try{srv.join();}catch(InterruptedException e){}
 		System.out.println("The end. Average latency "+cli.getLatency()+" µs");
 	}
 	
-	static Socket cli = null;
-	@SuppressWarnings("resource")
-	public static void testNBSok() {
-		Thread th = new Thread() {
-			@Override public void run() {
-				ServerSocket srv = null;
-				try {
-					srv = new ServerSocket(2205);
-					cli = srv.accept();
-				} catch (IOException e) {
-					e.printStackTrace();
-				} finally {
-					if (srv != null) {
-						try {
-							srv.close();
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-					}
-				}
-			}
-		};
-		th.start();
-		Socket cli2;
-		try {
-			cli2 = new Socket("localhost", 2205);
-		} catch (IOException e) {
-			System.out.println("Exception "+e.getClass().getSimpleName()+" - "+e.getMessage());
-			return;
-		}
-		while (th.isAlive())
-			try { th.join(); } catch (InterruptedException e) { }
-		try {
-			cli.setSoTimeout(1000);
-		} catch (SocketException e) {
-			System.out.println("Exception "+e.getClass().getSimpleName()+" - "+e.getMessage());
-		}
-		while (!cli.isClosed()) {
-			int n = 0;
-			try {
-				System.out.println((char)cli.getInputStream().read());
-			} catch (SocketTimeoutException e) {
-				System.out.println("Timeout");
-				try {
-					cli2.getOutputStream().write('a'+(n++));
-				} catch (IOException e1) {
-					System.out.println("Exception "+e.getClass().getSimpleName()+" - "+e.getMessage());
-					try {cli.close();}catch (IOException e2){}
-				}
-			} catch (IOException e) {
-				System.out.println("Exception "+e.getClass().getSimpleName()+" - "+e.getMessage());
-				try {cli.close();}catch (IOException e2){}
-			}
-		}
-	}
-	
-	public static void testEscape() {
-		for (String s : JRFClientCLI.splitCommand("cd \"di wi sp\" \"and another\""))
-			System.out.print("["+s+"] ");
-		System.out.println();
-		for (String s : JRFClientCLI.splitCommand("get file\\ with\\ spaces.txt"))
-			System.out.print("["+s+"] ");
-		System.out.println();
-		for (String s : JRFClientCLI.splitCommand("get file\\\"with\\\"doublequote.txt"))
-			System.out.print("["+s+"] ");
-		System.out.println();
-		for (String s : JRFClientCLI.splitCommand("get \"file \\\"with\\\"\\ doublequote.txt\" and\\ another"))
-			System.out.print("["+s+"] ");
-		System.out.println();
-	}
-	
-	public static void testParents() {
-		File f = File.listRoots()[0];
-		System.out.println(String.format("path [%s] parent [%s] name [%s]", f.getPath(), f.getParent(), f.getName()));
-		f = new File("D:/temp");
-		System.out.println(String.format("path [%s] parent [%s] name [%s]", f.getPath(), f.getParent(), f.getName()));
-	}
-	
-	public static void testDeflate() {
-		byte[] in = new byte[1500];
-		for (int i=0;i<in.length;i++)in[i]=(byte)i;
-		byte[] out = MsgData.deflate(in, in.length, 9);
-		System.out.println("Before "+in.length+", after "+out.length);
-		try {
-			out = MsgData.inflate(out, out.length);
-			System.out.println("Back "+out.length+", equals "+Arrays.equals(in, out));
-		} catch (IOException e) {
-			Throwable t = e.getCause();
-			System.err.println(t.getClass()+" - "+t.getMessage());
-		}
-	}
-	
 	public static void main(String[] args) throws IOException {
-//		test();
-		testDeflate();
-//		testParents();
-//		testEscape();
-//		testNBSok();
+		test();
 	}
-	
+
 }
+

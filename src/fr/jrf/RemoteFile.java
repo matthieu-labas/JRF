@@ -41,7 +41,7 @@ public class RemoteFile extends File {
 	
 	/**
 	 * Create a new {@link File} using {@code server} to query a remote {@link JRFProvider}.
-	 * @param server The connection to the remote {@code JFPProvider}.
+	 * @param server The connection to the remote {@code JRFProvider}.
 	 * @param pathname The absolute path of the <em>remote</em> file.
 	 * @param reqInfos {@code true} if file meta information should be requested. In that case,
 	 * 		the call will block until the {@code server} has sent the information.
@@ -92,7 +92,7 @@ public class RemoteFile extends File {
 	
 	/**
 	 * List the roots of the remote connection.
-	 * @param server The connection to the remote {@code JFPProvider}.
+	 * @param server The connection to the remote {@code JRFProvider}.
 	 * @return The remote {@link File#listRoots() filesystem roots}, or {@code null} if a network
 	 * 		error occured during communication with the server.
 	 */
@@ -308,7 +308,7 @@ public class RemoteFile extends File {
 	
 	/**
 	 * @return All remote file information (length, last modified date, attributes).
-	 * @throws IOException When the communication cannot be performed with the JFP provider.
+	 * @throws IOException When the communication cannot be performed with the JRF provider.
 	 */
 	public MsgReplyFileInfos getFileInfos() throws IOException {
 		long t0 = System.nanoTime();

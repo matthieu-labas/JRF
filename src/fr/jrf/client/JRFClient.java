@@ -26,11 +26,12 @@ import fr.jrf.msg.MsgData;
 import fr.jrf.msg.MsgFileCmd;
 import fr.jrf.msg.MsgGet;
 import fr.jrf.msg.MsgOpen;
+import fr.jrf.msg.MsgPing;
 import fr.jrf.server.JRFProvider;
 import fr.jrf.server.JRFServer;
 
 /**
- * The JFP Client is used to send file commands to a {@link JRFProvider}.
+ * The JRF Client is used to send file commands to a {@link JRFProvider}.
  * 
  * @author Matthieu Labas
  */
@@ -64,7 +65,7 @@ public class JRFClient extends Thread {
 	private volatile boolean goOn;
 	
 	JRFClient(Socket sok) {
-		setName("JFPClient "+sok.getLocalSocketAddress()+">"+sok.getRemoteSocketAddress());
+		setName("JRFClient "+sok.getLocalSocketAddress()+">"+sok.getRemoteSocketAddress());
 		try {
 			sok.setSoTimeout(TIMEOUT);
 		} catch (SocketException e) {
@@ -93,9 +94,9 @@ public class JRFClient extends Thread {
 	 * {@link System#nanoTime()} before the {@code send()} command was issued:
 	 * <pre>
 	 * long t0 = System.nanoTime();
-	 * int num = jfpClient.send(msgOut); // Latency also includes serialization and socket send time
-	 * Message reply = jfpClient.getReply(num); // Latency also includes network receive, deserialization and synchronization time
-	 * jfpClient.addLatencyNow(t0);
+	 * int num = jrfClient.send(msgOut); // Latency also includes serialization and socket send time
+	 * Message reply = jrfClient.getReply(num); // Latency also includes network receive, deserialization and synchronization time
+	 * jrfClient.addLatencyNow(t0);
 	 * </pre>
 	 * That value is not a precise network latency because it also include the time taken receiving
 	 * a message (bandwidth) and thread synchronization delays. Therefore, it should be used on
@@ -166,13 +167,15 @@ public class JRFClient extends Thread {
 	/**
 	 * Get a {@link RemoteInputStream} from the server.
 	 * @param remoteFile The absolute path name of the file to retrieve, <em>as seen by the server</em>.
+	 * @param deflate The deflate level to use when transferring file chunks. No compression is performed
+	 * 		if {@code <= 0}.
 	 * @return The {@code RemoteInputStream} (never {@code null}).
 	 * @throws FileNotFoundException If the file was not found remotely.
 	 * @throws IOException If a network error occurs.
 	 */
-	public InputStream getRemoteInputStream(String remoteFile) throws IOException {
+	public InputStream getRemoteInputStream(String remoteFile, int deflate) throws IOException {
 		long t0 = System.nanoTime();
-		short num = new MsgOpen(remoteFile, 'r', 0).send(sok); // Remote open file
+		short num = new MsgOpen(remoteFile, 'r', deflate).send(sok); // Remote open file
 		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
 		addLatencyNow(t0);
 		if (m instanceof MsgAck) {
@@ -194,9 +197,22 @@ public class JRFClient extends Thread {
 		}
 	}
 	
-	public OutputStream getRemoteOutputStream(String remoteFile) throws IOException {
+	public InputStream getRemoteInputStream(String remoteFile) throws IOException {
+		return getRemoteInputStream(remoteFile, 0);
+	}
+	
+	/**
+	 * Get a {@link RemoteOutputStream} to the server.
+	 * @param remoteFile The absolute path name of the file to write to, <em>as seen by the server</em>.
+	 * @param deflate The deflate level to use when transferring file chunks. No compression is performed
+	 * 		if {@code <= 0}.
+	 * @return The {@code RemoteOutputStream} (never {@code null}).
+	 * @throws FileNotFoundException If the file could not be created remotely.
+	 * @throws IOException If a network error occurs.
+	 */
+	public OutputStream getRemoteOutputStream(String remoteFile, int deflate) throws IOException {
 		long t0 = System.nanoTime();
-		short num = new MsgOpen(remoteFile, 'w', 0).send(sok); // Remote open file
+		short num = new MsgOpen(remoteFile, 'w', deflate).send(sok); // Remote open file
 		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
 		addLatencyNow(t0);
 		if (m instanceof MsgAck) {
@@ -216,6 +232,10 @@ public class JRFClient extends Thread {
 		} else {
 			throw new IOException("Unexpected message "+remoteFile);
 		}
+	}
+	
+	public OutputStream getRemoteOutputStream(String remoteFile) throws IOException {
+		return getRemoteOutputStream(remoteFile, 0);
 	}
 	
 	/**
@@ -354,7 +374,7 @@ public class JRFClient extends Thread {
 					continue;
 				}
 				
-				// Messages spontaneously sent by the JFPFileProvider
+				// Messages spontaneously sent by the JRFFileProvider
 				if (msg instanceof MsgFileCmd) { // Default case: file not found locally: close it remotely
 					Integer fileID = Integer.valueOf(((MsgFileCmd)msg).getFileID());
 					RemoteInputStream ris = remoteIS.get(fileID);
@@ -364,6 +384,10 @@ public class JRFClient extends Thread {
 					} else { // Handle "spontaneous" messages
 						ris.spontaneousMessage(msg);
 					}
+					
+				} else if (msg instanceof MsgPing) {
+					new MsgPing(msg.getNum()).send(sok);
+					
 				} else {
 					log.severe(getName()+": Unknown message "+msg);
 				}
@@ -387,7 +411,7 @@ public class JRFClient extends Thread {
 	
 	
 	public static void usage() {
-		System.out.println("Options: <hostname[:port]> of the JFP Server to connect to.");
+		System.out.println("Options: <hostname[:port]> of the JRF Server to connect to.");
 	}
 	
 	public static void main(String[] args) {

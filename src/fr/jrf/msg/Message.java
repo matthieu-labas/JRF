@@ -22,7 +22,7 @@ import fr.jrf.ByteBufferOut;
  * <p>On the wire, the Message is transmitted as follow:
  * <table border="1" style="border-collapse:collapse">
  * <tr bgcolor="silver"><th><strong>Field</strong></th><th><strong>Size</strong></th><th></th></tr>
- * <tr><td><strong>Marker</strong></td><td>4</td><td>{@code "_JFP"}</td></tr>
+ * <tr><td><strong>Marker</strong></td><td>4</td><td>{@code "_JRF"}</td></tr>
  * <tr><td><strong>Message number</strong></td><td>2</td><td>Starts at {@code 1}</td></tr>
  * <tr><td><strong>Reply to</strong></td><td>2</td><td>Message number to which this message replies</td></tr>
  * <tr><td><strong>Type length</strong></td><td>2</td><td></td></tr>
@@ -41,7 +41,7 @@ public abstract class Message {
 	/** Charset to encode {@code String}s ({@code UTF-8}). */
 	public static final Charset charset = Charset.forName("UTF-8");
 	
-	public static final byte[] MARKER = "_JFP".getBytes(charset);
+	public static final byte[] MARKER = "_JRF".getBytes(charset);
 	
 	/** Message counter. */
 	private static AtomicInteger numCounter = new AtomicInteger();

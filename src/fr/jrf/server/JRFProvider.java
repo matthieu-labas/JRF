@@ -33,6 +33,7 @@ import fr.jrf.msg.MsgClose;
 import fr.jrf.msg.MsgData;
 import fr.jrf.msg.MsgGet;
 import fr.jrf.msg.MsgOpen;
+import fr.jrf.msg.MsgPing;
 import fr.jrf.msg.MsgRead;
 import fr.jrf.msg.MsgSkip;
 import fr.jrf.msg.MsgWrite;
@@ -48,7 +49,7 @@ import fr.jrf.msg.file.MsgReplyFileList;
 import fr.jrf.msg.file.MsgReplyFileLong;
 
 /**
- * <p>The JFP Provider is the {@link JRFClient} Server counterpart, receiving file commands.</p>
+ * <p>The JRF Provider is the {@link JRFClient} Server counterpart, receiving file commands.</p>
  * <p>It keeps a list of locally opened files, corresponding to {@link RemoteInputStream}s on the
  * client side.</p>
  * 
@@ -57,6 +58,8 @@ import fr.jrf.msg.file.MsgReplyFileLong;
 public class JRFProvider extends Thread {
 	
 	private static final Logger log = Logger.getLogger(JRFProvider.class.getName());
+	
+	public static final int PING_TIMEOUT = 5000;
 	
 	private static final AtomicInteger fileCounter = new AtomicInteger();
 	
@@ -71,15 +74,21 @@ public class JRFProvider extends Thread {
 	/** Map of locally open files. Key is the file ID. */
 	private Map<Short,NamedFileOutputStream> localOS;
 	
+	/** When was the last network activity. */
+	private long lastActivity;
+	
 	/** Executor used to send files requested through {@link MsgGet} commands. */
 	private ExecutorService execGet;
+	
+	private volatile boolean pingSent;
+	private volatile boolean pingReceived;
 	
 	private volatile boolean goOn;
 	
 	/**
-	 * Create a {@ode JFPProvider} serving files to a remote {@link JRFClient} connected through the
+	 * Create a {@code JRFProvider} serving files to a remote {@link JRFClient} connected through the
 	 * given socket.
-	 * @param sok The connection to the remote {@code JFPClient}.
+	 * @param sok The connection to the remote {@code JRFClient}.
 	 */
 	JRFProvider(Socket sok, JRFServer srv) {
 		this.srv = srv;
@@ -95,6 +104,7 @@ public class JRFProvider extends Thread {
 			log.warning(getName()+": Unable to set keepalive on "+sok+": "+e.getMessage());
 		}
 		this.sok = sok;
+		lastActivity = System.currentTimeMillis();
 		localIS = new HashMap<>();
 		localOS = new HashMap<>();
 		goOn = true;
@@ -173,6 +183,10 @@ public class JRFProvider extends Thread {
 		close();
 	}
 	
+	public long lastActivityTime() {
+		return lastActivity;
+	}
+	
 	// "Open file" command
 	private void handleOpen(MsgOpen m) throws IOException {
 		short num = m.getNum();
@@ -236,7 +250,7 @@ public class JRFProvider extends Thread {
 					buf = MsgData.deflate(buf, n, defl);
 					n = buf.length;
 				}
-				data = new MsgData(num, fileID, buf, n, 0, false);
+				data = new MsgData(num, fileID, buf, n, defl, false);
 				log.fine(getName()+": read "+n+" bytes from file "+fileID);
 			} catch (IOException e) { // Exception during read
 				String msg = e.getMessage();
@@ -427,6 +441,49 @@ public class JRFProvider extends Thread {
 		}
 	}
 	
+	private void handlePing(MsgPing msg) {
+		if (!pingSent)
+			log.warning(getName()+": received unexpected ping");
+		pingReceived = true;
+		pingSent = false;
+		synchronized (this) {
+			notifyAll();
+		}
+	}
+	
+	private void checkPing() {
+		if (pingSent)
+			return;
+		long dead = System.currentTimeMillis() - lastActivity;
+//		log.finest(this+": "+dead+" ms inactivity");
+		if (dead < JRFServer.CLIENT_TIMEOUT)
+			return;
+		
+		log.fine(getName()+": No activity for "+(dead/1000)+"s. Pinging...");
+		pingReceived = false;
+		try {
+			new MsgPing().send(sok);
+			pingSent = true;
+			synchronized (this) {
+				while (!pingReceived) {
+					try {
+						wait(PING_TIMEOUT);
+						break;
+					} catch (InterruptedException e) { }
+				}
+			}
+		} catch (IOException e) {
+			log.warning(this+": Unable to send ping, closing. "+e.getMessage());
+			requestStop();
+		} finally {
+			if (!pingReceived) {
+				log.warning(getName()+": No response to ping after inactivity of "+(dead/1000)+"s. Closing...");
+				requestStop();
+			}
+			pingSent = pingReceived = false;
+		}
+	}
+	
 	@Override
 	public void run() {
 		while (goOn) {
@@ -434,6 +491,7 @@ public class JRFProvider extends Thread {
 				log.fine(getName()+": waiting for message...");
 				Message msg = Message.receive(sok);
 				log.fine(getName()+": received message "+msg);
+				lastActivity = System.currentTimeMillis();
 				
 				// Command messages
 				if (msg instanceof MsgOpen) { // Open file: reply with MsgAck to reply with file ID
@@ -457,11 +515,15 @@ public class JRFProvider extends Thread {
 				} else if (msg instanceof MsgGet) { // Request file content
 					handleFileGet((MsgGet)msg);
 					
+				} else if (msg instanceof MsgPing) { // Ping reply received ("pong")
+					handlePing((MsgPing)msg);
+					
 				} else { // Unknown
 					log.warning(getName()+": Don't know how to handle file message "+msg);
 				}
 			} catch (SocketTimeoutException e) {
 				log.finest(getName()+": timeout...");
+				checkPing(); // Ping client if needed
 				continue;
 			} catch (EOFException e) { // FIN received: graceful disconnection
 				log.info(getName()+": "+sok.getRemoteSocketAddress()+" disconnected. Ending.");

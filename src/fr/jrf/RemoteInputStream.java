@@ -17,7 +17,7 @@ import fr.jrf.server.JRFProvider;
  * 
  * @author Matthieu Labas
  */
-// TODO: Protocol handler? Change package to java.protocol.handler.pkgs.jfp. See http://stackoverflow.com/a/26409796/1098603
+// TODO: Protocol handler? Change package to java.protocol.handler.pkgs.jrf. See http://stackoverflow.com/a/26409796/1098603
 public class RemoteInputStream extends InputStream {
 	
 	/** The remote absolute path to the file. */
@@ -77,8 +77,13 @@ public class RemoteInputStream extends InputStream {
 			throw new IOException("Unexpected message "+msg+" ("+MsgData.class+" was expected)");
 		
 		MsgData m = (MsgData)msg;
+		byte[] data = m.getData();
 		int l = m.getLength();
-		System.arraycopy(m.getData(), 0, b, off, l);
+		if (m.getDeflate() > 0) {
+			data = MsgData.inflate(data, l);
+			l = data.length;
+		}
+		System.arraycopy(data, 0, b, off, l);
 		return (l == 0 ? -1 : l);
 	}
 	

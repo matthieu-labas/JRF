@@ -24,6 +24,10 @@ public class JRFServer extends Thread {
 	
 	public static final int DEFAULT_PORT = 2205;
 	
+	/** If no activity is detected on a client after this timeout, a ping message is sent to the client
+	 * which will close if it doesn't reply. */
+	public static final int CLIENT_TIMEOUT = 5 * 60_000;
+	
 	private static final Map<InetSocketAddress,JRFServer> instances = new HashMap<>(4);
 	
 	public static JRFServer get(InetSocketAddress addr) throws IOException {
@@ -45,7 +49,7 @@ public class JRFServer extends Thread {
 	
 	private ServerSocket srv;
 	
-	private boolean goOn;
+	private volatile boolean goOn;
 	
 	private List<JRFProvider> clients;
 	
@@ -58,14 +62,14 @@ public class JRFServer extends Thread {
 	}
 	
 	/**
-	 * @return The address the JFP Server is bound to.
+	 * @return The address the JRF Server is bound to.
 	 */
 	public InetSocketAddress getAddress() {
 		return (InetSocketAddress)srv.getLocalSocketAddress();
 	}
 	
 	/**
-	 * @return The list of JFP Providers currently connected to the JFP Server.
+	 * @return The list of JRF Providers currently connected to the JRF Server.
 	 */
 	public List<JRFProvider> getClients() {
 		return new ArrayList<>(clients);
