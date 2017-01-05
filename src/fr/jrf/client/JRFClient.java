@@ -179,8 +179,8 @@ public class JRFClient extends Thread {
 	 * @throws IOException If a network error occurs.
 	 */
 	public InputStream getRemoteInputStream(String remoteFile, int deflate) throws IOException {
-		long t0 = System.nanoTime();
 		short num = new MsgOpen(remoteFile, 'r', deflate).send(sok); // Remote open file
+		long t0 = System.nanoTime();
 		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
 		addLatencyNow(t0);
 		if (m instanceof MsgAck) {
@@ -216,8 +216,8 @@ public class JRFClient extends Thread {
 	 * @throws IOException If a network error occurs.
 	 */
 	public OutputStream getRemoteOutputStream(String remoteFile, int deflate) throws IOException {
-		long t0 = System.nanoTime();
 		short num = new MsgOpen(remoteFile, 'w', deflate).send(sok); // Remote open file
+		long t0 = System.nanoTime();
 		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
 		addLatencyNow(t0);
 		if (!(m instanceof MsgAck))

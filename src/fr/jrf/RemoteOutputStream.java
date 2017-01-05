@@ -9,29 +9,25 @@ import fr.jrf.msg.MsgAck;
 import fr.jrf.msg.MsgClose;
 import fr.jrf.msg.MsgData;
 import fr.jrf.msg.MsgWrite;
-import fr.jrf.server.JRFProvider;
 
 public class RemoteOutputStream extends OutputStream {
 	
-	/** The remote absolute path to the file. */
-	private String remoteFile;
-	
-	private short fileID;
-	
 	private int deflate;
 	
-	/** The client used to transfer commands to its connected {@link JRFProvider}. */
-	private JRFClient cli;
+	/** Stream statistics. */
+	private StreamInfo info;
 	
-	public RemoteOutputStream(String remoteFile, short fileID, int deflate, JRFClient cli) { // TODO: Deflate
-		this.remoteFile = remoteFile;
-		this.fileID = fileID;
+	public RemoteOutputStream(String remoteFile, short fileID, int deflate, JRFClient cli) {
+		info = new StreamInfo(remoteFile, fileID, cli);
 		this.deflate = deflate;
-		this.cli = cli;
 	}
 	
 	public int getFileID() {
-		return fileID;
+		return info.fileID;
+	}
+	
+	public StreamInfo getInfo() {
+		return info;
 	}
 	
 	public void spontaneousMessage(Message msg) throws IOException {
@@ -40,12 +36,12 @@ public class RemoteOutputStream extends OutputStream {
 	
 	@Override
 	public void close() throws IOException {
-		if (cli == null)
+		if (info.cli == null)
 			return;
 		
-		cli.send(new MsgClose(fileID));
-		cli.remoteStreamClosed(this);
-		cli = null;
+		info.cli.send(new MsgClose(info.fileID));
+		info.cli.remoteStreamClosed(this);
+		info.cli = null;
 	}
 	
 	@Override
@@ -55,19 +51,29 @@ public class RemoteOutputStream extends OutputStream {
 	
 	@Override
 	public void write(byte[] b, int off, int len) throws IOException {
+		JRFClient cli = info.cli;
 		if (cli == null)
 			throw new IOException("Closed");
 		
 		if (len == 0)
 			return;
-		if (deflate > 0) {
-			b = MsgData.deflate(b, off, len, deflate);
-			len = b.length;
-			// TODO: Stats on compression
+		info.bytesIO += len;
+		int defl = deflate;
+		if (defl > 0) {
+			byte[] bd = MsgData.deflate(b, off, len, deflate);
+			if (bd.length < len) { // Only apply deflate if it's worth it
+				b = bd;
+				len = b.length;
+			} else
+				defl = 0;
 		}
-		// No latency computing for write messages because the size can be too big and bandwidth would further polute the measurement
-		short num = cli.send(new MsgWrite(fileID, b, off, len, deflate));
+		info.bytesXfer += len;
+		long t0 = System.currentTimeMillis();
+		short num = cli.send(new MsgWrite(info.fileID, b, off, len, defl));
+		info.msXfer += System.currentTimeMillis() - t0;
+		t0 = System.nanoTime();
 		Message msg = cli.getReply(num, 0);
+		cli.addLatencyNow(t0);
 		if (!(msg instanceof MsgAck)) // Unexpected message
 			throw new IOException("Unexpected message "+msg+" ("+MsgAck.class+" was expected)");
 		
@@ -85,7 +91,7 @@ public class RemoteOutputStream extends OutputStream {
 	
 	@Override
 	public String toString() {
-		return ">"+remoteFile+"["+fileID+"]";
+		return ">"+info;
 	}
 	
 }

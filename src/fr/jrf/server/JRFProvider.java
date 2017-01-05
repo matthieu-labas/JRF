@@ -259,11 +259,16 @@ public class JRFProvider extends Thread {
 						break;
 					n += r;
 				}
-				if (is.deflate > 0) {
-					buf = MsgData.deflate(buf, 0, n, is.deflate);
-					n = buf.length;
+				int defl = is.deflate;
+				if (defl > 0) {
+					byte[] bufd = MsgData.deflate(buf, 0, n, defl);
+					if (bufd.length < n) { // Only apply deflate if it's worth it
+						buf = bufd;
+						n = buf.length;
+					} else
+						defl = 0;
 				}
-				data = new MsgData(num, fileID, buf, n, is.deflate, false);
+				data = new MsgData(num, fileID, buf, n, defl, false);
 				log.fine(getName()+": read "+n+" bytes from file "+fileID);
 			} catch (IOException e) { // Exception during read
 				String msg = e.getMessage();

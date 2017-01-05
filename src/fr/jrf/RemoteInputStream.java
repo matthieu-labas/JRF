@@ -20,22 +20,19 @@ import fr.jrf.server.JRFProvider;
 // TODO: Protocol handler? Change package to java.protocol.handler.pkgs.jrf. See http://stackoverflow.com/a/26409796/1098603
 public class RemoteInputStream extends InputStream {
 	
-	/** The remote absolute path to the file. */
-	private String remoteFile;
-	
-	private short fileID;
-	
-	/** The client used to transfer commands to its connected {@link JRFProvider}. */
-	private JRFClient cli;
+	/** Stream information. */
+	private StreamInfo info;
 	
 	public RemoteInputStream(String remoteFile, short fileID, JRFClient cli) {
-		this.remoteFile = remoteFile;
-		this.fileID = fileID;
-		this.cli = cli;
+		info = new StreamInfo(remoteFile, fileID, cli);
 	}
 	
 	public int getFileID() {
-		return fileID;
+		return info.fileID;
+	}
+	
+	public StreamInfo getInfo() {
+		return info;
 	}
 	
 	public void spontaneousMessage(Message msg) throws IOException {
@@ -44,12 +41,12 @@ public class RemoteInputStream extends InputStream {
 	
 	@Override
 	public void close() throws IOException {
-		if (cli == null)
+		if (info.cli == null)
 			return;
 		
-		cli.send(new MsgClose(fileID));
-		cli.remoteStreamClosed(this);
-		cli = null;
+		info.cli.send(new MsgClose(info.fileID));
+		info.cli.remoteStreamClosed(this);
+		info.cli = null;
 	}
 	
 	@Override
@@ -59,13 +56,16 @@ public class RemoteInputStream extends InputStream {
 	
 	@Override
     public int read(final byte b[], final int off, final int len) throws IOException {
+		JRFClient cli = info.cli;
 		if (cli == null)
 			throw new IOException("Closed");
 		
 		if (len == 0)
 			return 0;
 		// No latency computing for read messages because the received size can be too big and bandwidth would further polute the measurement
-		short num = cli.send(new MsgRead(fileID, len));
+		long t0 = System.currentTimeMillis();
+		short num = cli.send(new MsgRead(info.fileID, len));
+		info.msXfer += System.currentTimeMillis() - t0;
 		Message msg = cli.getReply(num, 0);
 		if (msg instanceof MsgAck) { // Exception occurred
 			MsgAck m = (MsgAck)msg;
@@ -79,24 +79,26 @@ public class RemoteInputStream extends InputStream {
 		MsgData m = (MsgData)msg;
 		byte[] data = m.getData();
 		int l = m.getLength();
+		info.bytesIO += l;
 		if (m.getDeflate() > 0) {
 			data = MsgData.inflate(data, l);
 			l = data.length;
-			// TODO: Stats on compression
 		}
+		info.bytesXfer += l;
 		System.arraycopy(data, 0, b, off, l);
 		return (l == 0 ? -1 : l);
 	}
 	
 	@Override
     public synchronized long skip(final long len) throws IOException {
+		JRFClient cli = info.cli;
 		if (cli == null)
 			throw new IOException("Closed");
 		
 		if (len == 0)
 			return 0;
+		short num = cli.send(new MsgSkip(info.fileID, len));
 		long t0 = System.nanoTime();
-		short num = cli.send(new MsgSkip(fileID, len));
 		Message msg = cli.getReply(num, 0);
 		cli.addLatencyNow(t0);
 		if (!(msg instanceof MsgAck))
@@ -113,7 +115,7 @@ public class RemoteInputStream extends InputStream {
 	
 	@Override
 	public String toString() {
-		return "<"+remoteFile+"["+fileID+"]";
+		return "<"+info;
 	}
 	
 }

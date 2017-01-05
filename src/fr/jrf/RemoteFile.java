@@ -99,8 +99,8 @@ public class RemoteFile extends File {
 	public static RemoteFile[] listRoots(JRFClient server) {
 		short num;
 		try {
-			long t0 = System.nanoTime();
 			num = server.send(new MsgFileRoots());
+			long t0 = System.nanoTime();
 			Message msg = server.getReply(num, 0);
 			server.addLatencyNow(t0);
 			if (!(msg instanceof MsgReplyFileList))
@@ -193,8 +193,8 @@ public class RemoteFile extends File {
 	private long getLong(Message msgLong) {
 		short num;
 		try {
-			long t0 = System.nanoTime();
 			num = cli.send(msgLong);
+			long t0 = System.nanoTime();
 			Message msg = cli.getReply(num, 0);
 			cli.addLatencyNow(t0);
 			if (!(msg instanceof MsgReplyFileLong))
@@ -311,8 +311,8 @@ public class RemoteFile extends File {
 	 * @throws IOException When the communication cannot be performed with the JRF provider.
 	 */
 	public MsgReplyFileInfos getFileInfos() throws IOException {
-		long t0 = System.nanoTime();
 		short num = cli.send(new MsgFileInfos(pathname));
+		long t0 = System.nanoTime();
 		Message msg = cli.getReply(num, 0);
 		cli.addLatencyNow(t0);
 		if (!(msg instanceof MsgReplyFileInfos))
