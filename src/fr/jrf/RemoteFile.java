@@ -179,15 +179,39 @@ public class RemoteFile extends File {
 	}
 	
 	@Override
+	public boolean setReadable(boolean readable) {
+		// TODO
+		return false;
+	}
+	
+	@Override
 	public boolean canWrite() {
 		checkRefresh();
 		return (attributes & FileInfos.BIT_CANWRITE) != 0;
 	}
 	
 	@Override
+	public boolean setWritable(boolean writable) {
+		// TODO
+		return false;
+	}
+	
+	@Override
 	public boolean canExecute() {
 		checkRefresh();
 		return (attributes & FileInfos.BIT_CANEXECUTE) != 0;
+	}
+	
+	@Override
+	public boolean setExecutable(boolean executable) {
+		// TODO
+		return false;
+	}
+	
+	@Override
+	public boolean setReadOnly() {
+		// TODO
+		return false;
 	}
 	
 	private long getLong(Message msgLong) {
@@ -219,6 +243,12 @@ public class RemoteFile extends File {
 	}
 	
 	@Override
+	public boolean mkdir() {
+		// TODO
+		return false;
+	}
+	
+	@Override
 	public boolean mkdirs() {
 		return (getLong(new MsgFileMkdirs(pathname)) != 0l);
 	}
@@ -242,6 +272,12 @@ public class RemoteFile extends File {
 	public long lastModified() {
 		checkRefresh();
 		return lastModified;
+	}
+	
+	@Override
+	public boolean setLastModified(long time) {
+		// TODO
+		return false;
 	}
 	
 	@Override

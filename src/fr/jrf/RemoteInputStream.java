@@ -79,12 +79,12 @@ public class RemoteInputStream extends InputStream {
 		MsgData m = (MsgData)msg;
 		byte[] data = m.getData();
 		int l = m.getLength();
-		info.bytesIO += l;
+		info.bytesXfer += l;
 		if (m.getDeflate() > 0) {
 			data = MsgData.inflate(data, l);
 			l = data.length;
 		}
-		info.bytesXfer += l;
+		info.bytesIO += l;
 		System.arraycopy(data, 0, b, off, l);
 		return (l == 0 ? -1 : l);
 	}

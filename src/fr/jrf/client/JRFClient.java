@@ -178,7 +178,7 @@ public class JRFClient extends Thread {
 	 * @throws FileNotFoundException If the file was not found remotely.
 	 * @throws IOException If a network error occurs.
 	 */
-	public InputStream getRemoteInputStream(String remoteFile, int deflate) throws IOException {
+	public RemoteInputStream getRemoteInputStream(String remoteFile, int deflate) throws IOException {
 		short num = new MsgOpen(remoteFile, 'r', deflate).send(sok); // Remote open file
 		long t0 = System.nanoTime();
 		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
@@ -202,7 +202,7 @@ public class JRFClient extends Thread {
 		}
 	}
 	
-	public InputStream getRemoteInputStream(String remoteFile) throws IOException {
+	public RemoteInputStream getRemoteInputStream(String remoteFile) throws IOException {
 		return getRemoteInputStream(remoteFile, 0);
 	}
 	
@@ -215,7 +215,7 @@ public class JRFClient extends Thread {
 	 * @throws FileNotFoundException If the file could not be created remotely.
 	 * @throws IOException If a network error occurs.
 	 */
-	public OutputStream getRemoteOutputStream(String remoteFile, int deflate) throws IOException {
+	public RemoteOutputStream getRemoteOutputStream(String remoteFile, int deflate) throws IOException {
 		short num = new MsgOpen(remoteFile, 'w', deflate).send(sok); // Remote open file
 		long t0 = System.nanoTime();
 		Message m = getReply(num, 0); // Wait for MsgAck to get file ID
@@ -238,7 +238,7 @@ public class JRFClient extends Thread {
 		return ros;
 	}
 	
-	public OutputStream getRemoteOutputStream(String remoteFile) throws IOException {
+	public RemoteOutputStream getRemoteOutputStream(String remoteFile) throws IOException {
 		return getRemoteOutputStream(remoteFile, 0);
 	}
 	
