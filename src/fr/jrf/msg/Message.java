@@ -154,7 +154,7 @@ public abstract class Message {
 			data.write(bb.getRawArray(), 0, szEnc); // Body
 			byte[] buf = data.getRawArray();
 			int len = data.size();
-			log.info(Thread.currentThread().getName()+" sending message "+this+" ("+szEnc+" body bytes)");
+			log.fine(Thread.currentThread().getName()+" sending message "+this+" ("+szEnc+" body bytes)");
 			log.finest(Thread.currentThread().getName()+"\t"+debug(buf, len));
 			sok.getOutputStream().write(buf, 0, len);
 			return num;

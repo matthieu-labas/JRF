@@ -1,15 +1,18 @@
 import static org.junit.Assert.*;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.util.Arrays;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
 
 import fr.jrf.RemoteFile;
 import fr.jrf.RemoteInputStream;
@@ -26,6 +29,7 @@ public class UnitTesting {
 	public static final String file2ReadRaw = workDir+"/test_raw.txt";
 	public static final String file2ReadDeflate = workDir+"/test_deflate.txt";
 	public static final String file2Write = workDir+"/test_out.txt";
+	public static final String bigFile = workDir+"/big.tiff";
 	
 	private static byte[] contentUndeflatable = "This string gets bigger on deflate".getBytes();
 	private static byte[] contentDeflatable = "blablablablablablablablablablablablablabla".getBytes();
@@ -56,8 +60,8 @@ public class UnitTesting {
 			fail("status");
 	}
 	
-	JRFServer srv;
-	JRFClient cli;
+	static JRFServer srv;
+	static JRFClient cli;
 	
 	@Before
 	public void init() throws IOException {
@@ -211,6 +215,96 @@ public class UnitTesting {
 		}
 		if (!dir.delete())
 			System.err.println("Cannot delete test directory");
+	}
+	
+	public static void checkSameFiles(String file1, String file2) {
+		byte[] buf1 = new byte[4096];
+		byte[] buf2 = new byte[buf1.length];
+		try (InputStream is1 = new BufferedInputStream(new FileInputStream(file1))) {
+			try (InputStream is2 = new BufferedInputStream(new FileInputStream(file2))) {
+				for (int i=1;;i++) {
+					int n1 = is1.read(buf1);
+					int n2 = is2.read(buf2);
+					assertEquals("#"+i, n1, n2);
+					if (n1 < 0)
+						break;
+					assertArrayEquals(buf1, buf2);
+				}
+			}
+		} catch (IOException e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	@Test
+	public void getFileSmall() {
+		String getFile = file2ReadRaw+".get";
+		try {
+			cli.getFile(file2ReadRaw, 0, getFile, 1500);
+			try (InputStream is = new BufferedInputStream(new FileInputStream(getFile))) {
+				byte[] buf = new byte[contentUndeflatable.length+1];
+				buf = Arrays.copyOf(buf, is.read(buf));
+				assertArrayEquals(contentUndeflatable, buf);
+			}
+			if (!new File(getFile).delete())
+				System.err.println("Unable to delete "+getFile);
+		} catch (IOException e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	@Test
+	public void getFileBig() {
+		String getFile = bigFile+".get";
+		try {
+			cli.getFile(bigFile, 0, getFile, 1500);
+			checkSameFiles(bigFile, getFile);
+			if (!new File(getFile).delete())
+				System.err.println("Unable to delete "+getFile);
+		} catch (IOException e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	@Test
+	public void getFileBigDeflate() {
+		String getFile = bigFile+".get";
+		try {
+			cli.getFile(bigFile, 9, getFile, 1500);
+			checkSameFiles(bigFile, getFile);
+			if (!new File(getFile).delete())
+				System.err.println("Unable to delete "+getFile);
+		} catch (IOException e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	@Test
+	public void getFileExactMTU() {
+		byte[] content = new byte[1500];
+		for (int i = 0; i < content.length; i++) content[i] = (byte)i;
+		try (OutputStream os = new FileOutputStream(file2Write)) {
+			os.write(content);
+		} catch (IOException e) {
+			fail(e.getMessage());
+		}
+		
+		String getFile = file2Write+".get";
+		try {
+			cli.getFile(file2Write, 0, getFile, content.length);
+			try (InputStream is = new BufferedInputStream(new FileInputStream(getFile))) {
+				byte[] buf = new byte[content.length+1];
+				buf = Arrays.copyOf(buf, is.read(buf));
+				assertArrayEquals(content, buf);
+			}
+			if (!new File(getFile).delete())
+				System.err.println("Unable to delete "+getFile);
+		} catch (IOException e) {
+			fail(e.getMessage());
+		} finally {
+			if (!new File(file2Write).delete())
+				System.err.println("Unable to delete "+getFile);
+		}
 	}
 	
 	@After

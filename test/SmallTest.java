@@ -9,7 +9,7 @@ import java.util.Arrays;
 import fr.jrf.client.JRFClientCLI;
 import fr.jrf.msg.MsgData;
 
-public class UnitTest {
+public class SmallTest {
 	
 	static Socket cli = null;
 	@SuppressWarnings("resource")

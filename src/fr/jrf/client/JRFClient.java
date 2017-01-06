@@ -16,6 +16,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterOutputStream;
 
 import fr.jrf.RemoteInputStream;
 import fr.jrf.RemoteOutputStream;
@@ -336,12 +338,20 @@ public class JRFClient extends Thread {
 	 * @param remote The remote file path.
 	 * @param deflate The deflate value to apply remotely on the data.
 	 * @param local The local file to write to.
+	 * @return The number of <em>network</em> bytes received (which can be less than the actual file length,
+	 * 		if compression is used).
 	 * @throws IOException
 	 */
 	public long getFile(String remote, int deflate, String local, int mtu) throws IOException {
 		short num = new MsgGet(remote, deflate, mtu).send(sok);
 		long len = 0l;
-		try (OutputStream os = new BufferedOutputStream(new FileOutputStream(local))) {
+		OutputStream os = new BufferedOutputStream(new FileOutputStream(local));
+		Inflater infl = null;
+		if (deflate > 0) {
+			infl = new Inflater();
+			os = new InflaterOutputStream(os, infl);
+		}
+		try {
 			Message m;
 			byte[] buf;
 			for (;;) {
@@ -352,13 +362,15 @@ public class JRFClient extends Thread {
 					throw new IOException("Unexpected message during file GET: "+m);
 				MsgData msg = (MsgData)m;
 				buf = msg.getData();
-				if (msg.getDeflate() > 0)
-					buf = MsgData.inflate(buf, buf.length);
 				os.write(buf);
-				len += buf.length;
+				len += buf.length; // Bytes received, network-wise (use infl.getBytesWritten() to get disk bytes i.e. actual file size)
 				if (!msg.hasNext())
 					break;
 			}
+		} finally {
+			try {
+				os.close();
+			} catch (IOException e) { }
 		}
 		return len;
 	}

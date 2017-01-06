@@ -25,6 +25,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterInputStream;
 
 import fr.jrf.RemoteInputStream;
 import fr.jrf.client.JRFClient;
@@ -407,33 +409,42 @@ public class JRFProvider extends Thread {
 	private void handleFileGet(final MsgGet m) throws IOException {
 		log.info(getName()+": Request get file "+m.getFilename());
 		if (execGet == null)
-			execGet = Executors.newSingleThreadExecutor();
+			execGet = Executors.newSingleThreadExecutor(); // TODO: Or multi-thread (but parallelizing disk I/O might not be a good thing...)
 		execGet.execute(new Runnable() {
-			@Override
-			public void run() {
-				byte[] bufIn = new byte[m.getMTU()];
-				byte[] bufOut = bufIn;
+			@Override public void run() {
+				byte[] buf = new byte[m.getMTU()];
 				String name = m.getFilename();
 				Thread.currentThread().setName("GET "+name);
 				short replyTo = m.getNum();
 				int deflate = m.getDeflate();
-				long len = new File(name).length();
-				try (InputStream is = new BufferedInputStream(new FileInputStream(name), 2*bufIn.length)) {
+				Deflater defl = null;
+				InputStream is = null;
+				try (InputStream topis = new BufferedInputStream(new FileInputStream(name), 2*buf.length)) {
+					if (deflate > 0) {
+						defl = new Deflater(deflate);
+						is = new DeflaterInputStream(topis, defl);
+					} else
+						is = topis;
+					
 					int n;
-					while (len > 0) {
-						n = read(is, bufIn);
-						len -= n;
-						if (deflate > 0) {
-							bufOut = MsgData.deflate(bufIn, 0, n, deflate);
-							n = bufOut.length; // TODO: Read until MTU bytes available after compression (see DeflateInputStream and PipedInputStream)
-						}
-						new MsgData(replyTo, (short)-1, bufOut, n, deflate, len > 0).send(sok);
+					boolean next = true;
+					while (next) {
+						n = read(is, buf);
+						next = (n == buf.length);
+						new MsgData(replyTo, (short)-1, buf, n, deflate, next).send(sok);
 					}
 				} catch (IOException ex) {
 					try {
 						new MsgAck(m.getReplyTo(), (short)-1, MsgAck.ERR, ex.getMessage()).send(sok);
 					} catch (IOException e) {
 						log.severe("I/O error when sending I/O error report on file GET "+name);
+					}
+				} finally {
+					if (defl != null) {
+						defl.end();
+						try {
+							is.close(); // 'is' is the DeflaterInputStream
+						} catch (IOException e) { }
 					}
 				}
 			}
