@@ -150,7 +150,7 @@ public abstract class Message {
 	 * @return The message number.
 	 * @throws IOException
 	 */
-	public short send(Socket sok) throws IOException {
+	public synchronized short send(Socket sok) throws IOException {
 		ByteBufferOut bb = encode();
 		int szEnc = bb.size();
 		String cls = getClass().getName();
