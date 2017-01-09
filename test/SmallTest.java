@@ -6,8 +6,8 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.Arrays;
 
-import fr.jrf.Utils;
-import fr.jrf.client.JRFClientCLI;
+import net.jrf.Utils;
+import net.jrf.client.JRFClientCLI;
 
 public class SmallTest {
 	
@@ -96,7 +96,7 @@ public class SmallTest {
 		byte[] out = Utils.deflate(in, 0, in.length, 9);
 		System.out.println("Before "+in.length+", after "+out.length);
 		try {
-			out = Utils.inflate(out, out.length);
+			out = Utils.inflate(out, 0, out.length);
 			System.out.println("Back "+out.length+", equals "+Arrays.equals(in, out));
 		} catch (IOException e) {
 			Throwable t = e.getCause();

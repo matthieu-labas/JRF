@@ -14,14 +14,14 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import fr.jrf.RemoteFile;
-import fr.jrf.RemoteInputStream;
-import fr.jrf.RemoteOutputStream;
-import fr.jrf.StreamInfo;
-import fr.jrf.Utils;
-import fr.jrf.client.JRFClient;
-import fr.jrf.msg.file.MsgReplyFileInfos;
-import fr.jrf.server.JRFServer;
+import net.jrf.RemoteFile;
+import net.jrf.RemoteInputStream;
+import net.jrf.RemoteOutputStream;
+import net.jrf.StreamInfo;
+import net.jrf.Utils;
+import net.jrf.client.JRFClient;
+import net.jrf.msg.file.MsgFileInfos;
+import net.jrf.server.JRFServer;
 
 public class UnitTesting {
 	
@@ -48,7 +48,7 @@ public class UnitTesting {
 			fail("status");
 	}
 	
-	public static void compareFileAttributes(File f1, MsgReplyFileInfos f2) {
+	public static void compareFileAttributes(File f1, MsgFileInfos f2) {
 		if (!f1.getName().equals(f2.getName()))
 			fail("name");
 		if (f1.canRead() != f2.canRead() || f1.canWrite() != f2.canWrite() || f1.canExecute() != f2.canExecute())
