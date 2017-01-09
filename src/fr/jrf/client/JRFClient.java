@@ -1,6 +1,8 @@
 package fr.jrf.client;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -375,6 +377,25 @@ public class JRFClient extends Thread {
 		return len;
 	}
 	
+	public long putFile(String local, int deflate, String remote, int mtu) throws IOException {
+		// TODO: One day, implement a deflated putFile(), as in getFile()
+		long len = 0l;
+		byte[] buf = new byte[mtu];
+		try (RemoteOutputStream os = getRemoteOutputStream(remote, deflate)) {
+			try (InputStream is = new BufferedInputStream(new FileInputStream(local), 2*buf.length)) {
+				int n;
+				for (;;) {
+					n = is.read(buf);
+					if (n < 0)
+						break;
+					os.write(buf, 0, n);
+					len += n;
+				}
+			}
+		}
+		return len;
+	}
+	
 	@Override
 	public void run() {
 		while (goOn) {
@@ -397,9 +418,8 @@ public class JRFClient extends Thread {
 					if (ris == null) { // Cannot find client: send a close()
 						log.warning(getName()+": Cannot find remote opened file with ID "+fileID+", closing file... (message "+msg+")");
 						new MsgClose(fileID.shortValue()).send(sok);
-					} else { // Handle "spontaneous" messages
+					} else // Handle "spontaneous" messages
 						ris.spontaneousMessage(msg);
-					}
 					
 				} else if (msg instanceof MsgPing) {
 					new MsgPing(msg.getNum()).send(sok);

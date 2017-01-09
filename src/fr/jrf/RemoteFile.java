@@ -1,17 +1,16 @@
 package fr.jrf;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.ArrayList;
 
 import fr.jrf.client.JRFClient;
 import fr.jrf.msg.Message;
-import fr.jrf.msg.file.MsgFileDelete;
-import fr.jrf.msg.file.MsgFileInfos;
-import fr.jrf.msg.file.MsgFileList;
-import fr.jrf.msg.file.MsgFileMkdirs;
-import fr.jrf.msg.file.MsgFileRoots;
-import fr.jrf.msg.file.MsgFileSpace;
-import fr.jrf.msg.file.MsgFileSpace.SpaceInfo;
+import fr.jrf.msg.file.MsgFALong;
+import fr.jrf.msg.file.MsgFAString;
+import fr.jrf.msg.file.MsgFileAction;
+import fr.jrf.msg.file.MsgFileAction.FileAction;
 import fr.jrf.msg.file.MsgReplyFileInfos;
 import fr.jrf.msg.file.MsgReplyFileList;
 import fr.jrf.msg.file.MsgReplyFileLong;
@@ -54,12 +53,6 @@ public class RemoteFile extends File {
 		this.cli = server;
 		if (reqInfos)
 			refresh();
-		
-		// TODO: Override
-//		super.list(filter);
-		
-//		super.renameTo(dest);
-//		super.createNewFile();
 	}
 	
 	public RemoteFile(JRFClient server, String pathname) throws IOException {
@@ -79,7 +72,15 @@ public class RemoteFile extends File {
 	}
 	
 	/**
-	 * Refresh file meta information.
+	 * @return The last exception that occurred (usually an {@link IOException} on methods returning a boolean),
+	 * 		or {@code null} if none.
+	 */
+	public Exception getLastException() {
+		return ex;
+	}
+	
+	/**
+	 * Refresh file meta information (length, date, attributes).
 	 * @throws IOException When an error occurs during communication with server.
 	 */
 	public void refresh() throws IOException {
@@ -99,7 +100,7 @@ public class RemoteFile extends File {
 	public static RemoteFile[] listRoots(JRFClient server) {
 		short num;
 		try {
-			num = server.send(new MsgFileRoots());
+			num = server.send(new MsgFileAction(FileAction.LIST_ROOTS, null));
 			long t0 = System.nanoTime();
 			Message msg = server.getReply(num, 0);
 			server.addLatencyNow(t0);
@@ -119,23 +120,6 @@ public class RemoteFile extends File {
 			return null;
 		}
 	}
-	
-//	private boolean is(MsgFile msgIs) {
-//		short num;
-//		try {
-//			long t0 = System.nanoTime();
-//			num = cli.send(msgIs);
-//			Message msg = cli.getReply(num, 0);
-//			cli.addLatencyNow(t0);
-//			if (!(msg instanceof MsgReplyFileLong))
-//				throw new IOException("Unexpected reply message "+msg);
-//			ex = null;
-//			return (((MsgReplyFileLong)msg).getValue() != 0);
-//		} catch (IOException e) {
-//			ex = e;
-//			return false;
-//		}
-//	}
 	
 	private void checkRefresh() {
 		if (init)
@@ -180,8 +164,7 @@ public class RemoteFile extends File {
 	
 	@Override
 	public boolean setReadable(boolean readable) {
-		// TODO
-		return false;
+		return getLong(new MsgFileAction(FileAction.SET_READ, pathname)) != 0l;
 	}
 	
 	@Override
@@ -192,8 +175,7 @@ public class RemoteFile extends File {
 	
 	@Override
 	public boolean setWritable(boolean writable) {
-		// TODO
-		return false;
+		return getLong(new MsgFileAction(FileAction.SET_WRITE, pathname)) != 0l;
 	}
 	
 	@Override
@@ -204,14 +186,39 @@ public class RemoteFile extends File {
 	
 	@Override
 	public boolean setExecutable(boolean executable) {
-		// TODO
-		return false;
+		return getLong(new MsgFileAction(FileAction.SET_EXECUTE, pathname)) != 0l;
 	}
 	
 	@Override
 	public boolean setReadOnly() {
-		// TODO
-		return false;
+		return getLong(new MsgFileAction(FileAction.SET_READONLY, pathname)) != 0l;
+	}
+	
+	@Override
+    public String[] list(FilenameFilter filter) {
+		if (filter == null)
+			return list();
+		RemoteFile[] files = listFiles();
+		ArrayList<String> ret = new ArrayList<>(files.length);
+		for (File f : files) {
+			if (filter.accept(f, f.getName()))
+				ret.add(f.getName());
+		}
+		return ret.toArray(new String[0]);
+	}
+	
+	@Override
+    public boolean renameTo(File dest) {
+		String path = dest.getAbsolutePath();
+		boolean ret = (getLong(new MsgFAString(FileAction.RENAME, pathname, path)) != 0l);
+		if (ret)
+			pathname = path;
+		return ret;
+	}
+	
+	@Override
+    public boolean createNewFile() throws IOException {
+		return getLong(new MsgFileAction(FileAction.CREATE_NEW, pathname)) != 0l;
 	}
 	
 	private long getLong(Message msgLong) {
@@ -239,33 +246,35 @@ public class RemoteFile extends File {
 	
 	@Override
 	public boolean delete() {
-		return (getLong(new MsgFileDelete(pathname)) != 0l);
+		boolean ret = (getLong(new MsgFileAction(FileAction.DELETE, pathname)) != 0l);
+		if (ret)
+			attributes = 0;
+		return ret;
 	}
 	
 	@Override
 	public boolean mkdir() {
-		// TODO
-		return false;
+		return (getLong(new MsgFileAction(FileAction.MKDIR, pathname)) != 0l);
 	}
 	
 	@Override
 	public boolean mkdirs() {
-		return (getLong(new MsgFileMkdirs(pathname)) != 0l);
+		return (getLong(new MsgFileAction(FileAction.MKDIRS, pathname)) != 0l);
 	}
 	
 	@Override
 	public long getFreeSpace() {
-		return getLong(new MsgFileSpace(pathname, SpaceInfo.FREE_SPACE));
+		return getLong(new MsgFileAction(FileAction.FREE_SPACE, pathname));
 	}
 	
 	@Override
 	public long getTotalSpace() {
-		return getLong(new MsgFileSpace(pathname, SpaceInfo.TOTAL_SPACE));
+		return getLong(new MsgFileAction(FileAction.TOTAL_SPACE, pathname));
 	}
 	
 	@Override
 	public long getUsableSpace() {
-		return getLong(new MsgFileSpace(pathname, SpaceInfo.USABLE_SPACE));
+		return getLong(new MsgFileAction(FileAction.USABLE_SPACE, pathname));
 	}
 	
 	@Override
@@ -276,12 +285,11 @@ public class RemoteFile extends File {
 	
 	@Override
 	public boolean setLastModified(long time) {
-		// TODO
-		return false;
+		return getLong(new MsgFALong(FileAction.SET_LAST_MODIFIED, pathname, time)) != 0l;
 	}
 	
 	@Override
-	public File getParentFile() {
+	public RemoteFile getParentFile() {
 		String parent = getParent();
 		if (parent == null)
 			return null;
@@ -293,14 +301,6 @@ public class RemoteFile extends File {
 			ex = e;
 			return null;
 		}
-	}
-	
-	@Override
-	public String getName() {
-		String name = super.getName();
-		if (!name.isEmpty())
-			return name;
-		return getPath();
 	}
 	
 	@Override
@@ -319,7 +319,7 @@ public class RemoteFile extends File {
 		short num;
 		try {
 			// No latency calculation for file list because the received message can be big
-			num = cli.send(new MsgFileList(pathname));
+			num = cli.send(new MsgFileAction(FileAction.LIST_FILES, pathname));
 			Message msg = cli.getReply(num, 0);
 			if (!(msg instanceof MsgReplyFileList))
 				throw new IOException();
@@ -347,7 +347,7 @@ public class RemoteFile extends File {
 	 * @throws IOException When the communication cannot be performed with the JRF provider.
 	 */
 	public MsgReplyFileInfos getFileInfos() throws IOException {
-		short num = cli.send(new MsgFileInfos(pathname));
+		short num = cli.send(new MsgFileAction(FileAction.GET_ATTRIBUTES, pathname));
 		long t0 = System.nanoTime();
 		Message msg = cli.getReply(num, 0);
 		cli.addLatencyNow(t0);

@@ -2,6 +2,7 @@ package fr.jrf;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.zip.Inflater;
 
 import fr.jrf.client.JRFClient;
 import fr.jrf.msg.Message;
@@ -9,7 +10,8 @@ import fr.jrf.msg.MsgAck;
 import fr.jrf.msg.MsgClose;
 import fr.jrf.msg.MsgData;
 import fr.jrf.msg.MsgRead;
-import fr.jrf.msg.MsgSkip;
+import fr.jrf.msg.MsgISAction;
+import fr.jrf.msg.MsgISAction.StreamAction;
 import fr.jrf.server.JRFProvider;
 
 /**
@@ -20,11 +22,18 @@ import fr.jrf.server.JRFProvider;
 // TODO: Protocol handler? Change package to java.protocol.handler.pkgs.jrf. See http://stackoverflow.com/a/26409796/1098603
 public class RemoteInputStream extends InputStream {
 	
+	private Inflater infl;
+	
 	/** Stream information. */
 	private StreamInfo info;
 	
+	/** Exception that might have been thrown and caught by overriden methods that don't throw exceptions
+	 * (e.g. {@link #mark(int)}, {@link #reset()}). */
+	private Exception ex;
+	
 	public RemoteInputStream(String remoteFile, short fileID, JRFClient cli) {
 		info = new StreamInfo(remoteFile, fileID, cli);
+		ex = null;
 	}
 	
 	public int getFileID() {
@@ -35,8 +44,22 @@ public class RemoteInputStream extends InputStream {
 		return info;
 	}
 	
+	/**
+	 * @return The last exception that occurred (usually an {@link IOException} on methods returning a boolean),
+	 * 		or {@code null} if none.
+	 */
+	public Exception getLastException() {
+		return ex;
+	}
+	
 	public void spontaneousMessage(Message msg) throws IOException {
 		// TODO: Handle spontaneous close, etc.
+	}
+	
+	@Override
+	protected void finalize() throws Throwable {
+		close();
+		super.finalize();
 	}
 	
 	@Override
@@ -44,9 +67,16 @@ public class RemoteInputStream extends InputStream {
 		if (info.cli == null)
 			return;
 		
-		info.cli.send(new MsgClose(info.fileID));
-		info.cli.remoteStreamClosed(this);
-		info.cli = null;
+		if (infl != null) {
+			infl.end();
+			infl = null;
+		}
+		try {
+			info.cli.send(new MsgClose(info.fileID));
+		} finally { // Do that even when IOException occurs
+			info.cli.remoteStreamClosed(this);
+			info.cli = null;
+		}
 	}
 	
 	@Override
@@ -81,7 +111,9 @@ public class RemoteInputStream extends InputStream {
 		int l = m.getLength();
 		info.bytesXfer += l;
 		if (m.getDeflate() > 0) {
-			data = MsgData.inflate(data, l);
+			if (infl == null)
+				infl = new Inflater();
+			data = Utils.inflate(data, l, infl);
 			l = data.length;
 		}
 		info.bytesIO += l;
@@ -89,15 +121,9 @@ public class RemoteInputStream extends InputStream {
 		return (l == 0 ? -1 : l);
 	}
 	
-	@Override
-    public synchronized long skip(final long len) throws IOException {
+	private long sendAction(StreamAction action, short fileID, long val) throws IOException {
 		JRFClient cli = info.cli;
-		if (cli == null)
-			throw new IOException("Closed");
-		
-		if (len == 0)
-			return 0;
-		short num = cli.send(new MsgSkip(info.fileID, len));
+		short num = cli.send(new MsgISAction(action, fileID, val));
 		long t0 = System.nanoTime();
 		Message msg = cli.getReply(num, 0);
 		cli.addLatencyNow(t0);
@@ -111,7 +137,61 @@ public class RemoteInputStream extends InputStream {
 			throw new IOException(err);
 		}
 		return m.getCode();
+	}
+	
+	@Override
+    public synchronized long skip(final long len) throws IOException {
+		if (info.cli == null)
+			throw new IOException("Closed");
+		if (len == 0)
+			return 0;
+		return sendAction(StreamAction.SKIP, info.fileID, len);
     }
+	
+	@Override
+    public int available() throws IOException {
+		if (info.cli == null)
+			throw new IOException("Closed");
+		return (int)sendAction(StreamAction.AVAILABLE, info.fileID, -1l);
+	}
+	
+	@Override
+    public boolean markSupported() {
+		if (info.cli == null)
+			return false;
+		try {
+			boolean ret = (sendAction(StreamAction.MARK_SUPPORTED, info.fileID, -1l) != 0l);
+			ex = null;
+			return ret;
+		} catch (IOException e) {
+			ex = e;
+			return false;
+		}
+	}
+	
+	@Override
+	public synchronized void mark(int readLimit) {
+		if (info.cli == null)
+			return;
+		try {
+			sendAction(StreamAction.MARK, info.fileID, readLimit);
+			ex = null;
+		} catch (IOException e) {
+			ex = e;
+		}
+	}
+	
+	@Override
+	public synchronized void reset() {
+		if (info.cli == null)
+			return;
+		try {
+			sendAction(StreamAction.RESET, info.fileID, -1l);
+			ex = null;
+		} catch (IOException e) {
+			ex = e;
+		}
+	}
 	
 	@Override
 	public String toString() {

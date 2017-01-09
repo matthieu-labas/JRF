@@ -277,21 +277,7 @@ public class JRFClientCLI implements Runnable {
 					try {
 						long t0 = System.currentTimeMillis();
 						long len = 0;
-//						try (FileOutputStream fos = new FileOutputStream(new File(local, new File(arg1).getName()))) {
-//							byte[] buf = new byte[1500]; // TODO: MTU
-//							try (InputStream is = new BufferedInputStream(cli.getRemoteInputStream(rem), 2*buf.length)) {
-//								int n;
-//								for (;;) {
-//									n = is.read(buf);
-//									if (n < 0) // EOF
-//										break;
-//									len += n;
-//									fos.write(buf, 0, n);
-//								}
-//							}
-//						}
-//						t0 = System.currentTimeMillis() - t0;
-						len = cli.getFile(rem, deflate, arg1, 1500); // TODO: MTU
+						len = cli.getFile(rem, deflate, arg1, mtu);
 						t0 = System.currentTimeMillis() - t0;
 						System.out.println(String.format("Copied %d bytes in %.1f s (%.1f kB/s)", len, t0 / 1000.0f, (len/1024.0f*1000.0f/t0)));
 					} catch (IOException e) {
@@ -301,7 +287,7 @@ public class JRFClientCLI implements Runnable {
 					
 				case "put":
 					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
-					// TODO: RemoteOuputStream
+					// TODO: cli.putFile()
 					break;
 					
 				case "opt":

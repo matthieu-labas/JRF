@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -29,24 +30,24 @@ import java.util.zip.Deflater;
 import java.util.zip.DeflaterInputStream;
 
 import fr.jrf.RemoteInputStream;
+import fr.jrf.Utils;
 import fr.jrf.client.JRFClient;
 import fr.jrf.msg.Message;
 import fr.jrf.msg.MsgAck;
 import fr.jrf.msg.MsgClose;
 import fr.jrf.msg.MsgData;
+import fr.jrf.msg.MsgFlush;
 import fr.jrf.msg.MsgGet;
+import fr.jrf.msg.MsgISAction;
+import fr.jrf.msg.MsgISAction.StreamAction;
 import fr.jrf.msg.MsgOpen;
 import fr.jrf.msg.MsgPing;
 import fr.jrf.msg.MsgRead;
-import fr.jrf.msg.MsgSkip;
 import fr.jrf.msg.MsgWrite;
-import fr.jrf.msg.file.MsgFile;
-import fr.jrf.msg.file.MsgFileDelete;
-import fr.jrf.msg.file.MsgFileInfos;
-import fr.jrf.msg.file.MsgFileList;
-import fr.jrf.msg.file.MsgFileMkdirs;
-import fr.jrf.msg.file.MsgFileRoots;
-import fr.jrf.msg.file.MsgFileSpace;
+import fr.jrf.msg.file.MsgFALong;
+import fr.jrf.msg.file.MsgFAString;
+import fr.jrf.msg.file.MsgFileAction;
+import fr.jrf.msg.file.MsgFileAction.FileAction;
 import fr.jrf.msg.file.MsgReplyFileInfos;
 import fr.jrf.msg.file.MsgReplyFileList;
 import fr.jrf.msg.file.MsgReplyFileLong;
@@ -80,8 +81,8 @@ public class JRFProvider extends Thread {
 	/** When was the last network activity. */
 	private long lastActivity;
 	
-	/** Executor used to send files requested through {@link MsgGet} commands. */
-	private ExecutorService execGet;
+	/** Executor used to exchange files requested through {@link MsgGet} commands. */
+	private ExecutorService execFile;
 	
 	private volatile boolean pingSent;
 	private volatile boolean pingReceived;
@@ -175,11 +176,11 @@ public class JRFProvider extends Thread {
 		
 		// Close the connection
 		JRFClient.gracefulClose(sok, true);
-		if (execGet != null) {
-			execGet.shutdown();
+		if (execFile != null) {
+			execFile.shutdown();
 			for (;;) {
 				try {
-					if (execGet.awaitTermination(1, TimeUnit.SECONDS))
+					if (execFile.awaitTermination(1, TimeUnit.SECONDS))
 						break;
 				} catch (InterruptedException e) { }
 			}
@@ -263,7 +264,7 @@ public class JRFProvider extends Thread {
 				}
 				int defl = is.deflate;
 				if (defl > 0) {
-					byte[] bufd = MsgData.deflate(buf, 0, n, defl);
+					byte[] bufd = Utils.deflate(buf, 0, n, defl);
 					if (bufd.length < n) { // Only apply deflate if it's worth it
 						buf = bufd;
 						n = buf.length;
@@ -306,7 +307,7 @@ public class JRFProvider extends Thread {
 		} else {
 			byte[] buf = m.getBuffer();
 			if (m.getDeflate() > 0) {
-				buf = MsgData.inflate(buf, len);
+				buf = Utils.inflate(buf, len);
 				len = buf.length;
 			}
 			try {
@@ -327,12 +328,13 @@ public class JRFProvider extends Thread {
 		}
 	}
 	
-	// "Skip from file" command
-	private void handleSkip(MsgSkip m) throws IOException {
+	// "Action on file" command
+	private void handleAction(MsgISAction m) throws IOException {
 		short num = m.getNum();
 		short fileID = m.getFileID();
-		long skip = m.getSkip();
-		log.info(getName()+": Request skip "+skip+" bytes on file "+fileID);
+		StreamAction action = m.getAction();
+		long val = m.getValue();
+		log.info(getName()+": Request "+m);
 		MsgAck ack;
 		InputStream is;
 		synchronized (localIS) {
@@ -343,18 +345,59 @@ public class JRFProvider extends Thread {
 			ack = new MsgAck(num, fileID, MsgAck.WARN, "File not found");
 		} else {
 			try {
-				ack = new MsgAck(num, fileID, (int)is.skip(skip), null); // Perform skip
-				log.fine(getName()+": Actually skipped "+ack.getCode()+" bytes from file "+fileID);
-			} catch (IOException e) { // Exception during skip
+				long ret = -1l;
+				// Perform the action
+				switch (action) {
+					case AVAILABLE: ret = is.available(); break;
+					case MARK_SUPPORTED: ret = (is.markSupported() ? 1l : 0l); break;
+					case MARK: is.mark((int)val); break;
+					case RESET: is.reset(); break;
+					case SKIP: ret = is.skip(val); break;
+				}
+				ack = new MsgAck(num, fileID, ret, null);
+				log.fine(getName()+": Performed "+action+"="+ret+" on file "+fileID);
+			} catch (IOException e) { // Exception during action
 				String msg = e.getMessage();
-				log.warning(getName()+": Error when skipping "+skip+" bytes in file ID "+fileID+": "+msg);
+				log.warning(getName()+": Error when performing "+action+"/"+val+" on file ID "+fileID+": "+msg);
 				ack = new MsgAck(num, fileID, MsgAck.ERR, msg);
 			}
 		}
 		try {
 			ack.send(sok);
 		} catch (IOException e) {
-			log.warning(getName()+": Unable to send skip-Ack event back to requestor: "+e.getMessage());
+			log.warning(getName()+": Unable to send "+action+"-Ack event back to requestor: "+e.getMessage());
+			throw e;
+		}
+	}
+	
+	// "Flush on file" command
+	private void handleFlush(MsgFlush m) throws IOException {
+		short num = m.getNum();
+		short fileID = m.getFileID();
+		log.info(getName()+": Request "+m);
+		MsgAck ack;
+		OutputStream os;
+		synchronized (localOS) {
+			os = localOS.get(fileID);
+		}
+		if (os == null) { // File descriptor not found
+			log.warning(getName()+": Local file ID "+fileID+" not found");
+			ack = new MsgAck(num, fileID, MsgAck.WARN, "File not found");
+		} else {
+			try {
+				os.flush();
+				ack = new MsgAck(num, fileID, 1l, null);
+				log.fine(getName()+": Performed flush on file "+fileID);
+			} catch (IOException e) {
+				String msg = e.getMessage();
+				log.warning(getName()+": Error when performing flush on file ID "+fileID+": "+msg);
+				ack = new MsgAck(num, fileID, MsgAck.ERR, msg);
+			}
+		}
+		try {
+			ack.send(sok);
+		} catch (IOException e) {
+			log.warning(getName()+": Unable to send flush-ack event back to requestor: "+e.getMessage());
 			throw e;
 		}
 	}
@@ -384,105 +427,83 @@ public class JRFProvider extends Thread {
 		}
 	}
 	
-	/**
-	 * Reads every possible byte into the given array, returning the number of bytes actually read,
-	 * which can be {@code < buf.length} if EOF has been reached on {@code is}.
-	 * @param is The {@code InputStream} to read.
-	 * @param buf The buffer to fill with data read from {@code is}.
-	 * @return The number of bytes read (up to {@code buf.length}.
-	 * @throws IOException
-	 */
-	private static int read(InputStream is, byte[] buf) throws IOException {
-		int n;
-		int len = buf.length, tot = 0;
-		while (len > 0) {
-			n = is.read(buf, tot, len);
-			if (n < 0)
-				break;
-			tot += n;
-			len -= n;
-		}
-		return tot;
-	}
-	
 	// "File get" command
 	private void handleFileGet(final MsgGet m) throws IOException {
 		log.info(getName()+": Request get file "+m.getFilename());
-		if (execGet == null)
-			execGet = Executors.newSingleThreadExecutor(); // TODO: Or multi-thread (but parallelizing disk I/O might not be a good thing...)
-		execGet.execute(new Runnable() {
-			@Override public void run() {
-				byte[] buf = new byte[m.getMTU()];
-				String name = m.getFilename();
-				Thread.currentThread().setName("GET "+name);
-				short replyTo = m.getNum();
-				int deflate = m.getDeflate();
-				Deflater defl = null;
-				InputStream is = null;
-				try (InputStream topis = new BufferedInputStream(new FileInputStream(name), 2*buf.length)) {
-					if (deflate > 0) {
-						defl = new Deflater(deflate);
-						is = new DeflaterInputStream(topis, defl);
-					} else
-						is = topis;
-					
-					int n;
-					boolean next = true;
-					while (next) {
-						n = read(is, buf);
-						next = (n == buf.length);
-						new MsgData(replyTo, (short)-1, buf, n, deflate, next).send(sok);
-					}
-				} catch (IOException ex) {
-					try {
-						new MsgAck(m.getReplyTo(), (short)-1, MsgAck.ERR, ex.getMessage()).send(sok);
-					} catch (IOException e) {
-						log.severe("I/O error when sending I/O error report on file GET "+name);
-					}
-				} finally {
-					if (defl != null) {
-						defl.end();
+		if (execFile == null)
+			execFile = Executors.newSingleThreadExecutor(); // TODO: Or multi-thread (but parallelizing disk I/O might not be a good thing...)
+		try {
+			execFile.execute(new Runnable() {
+				@Override public void run() {
+					byte[] buf = new byte[m.getMTU() - Message.getHeaderSize(MsgData.class)];
+					String name = m.getFilename();
+					Thread.currentThread().setName("GET "+name);
+					short replyTo = m.getNum();
+					int deflate = m.getDeflate();
+					Deflater defl = null;
+					InputStream is = null;
+					try (InputStream topis = new BufferedInputStream(new FileInputStream(name), 2*buf.length)) {
+						if (deflate > 0) {
+							defl = new Deflater(deflate);
+							is = new DeflaterInputStream(topis, defl);
+						} else
+							is = topis;
+						
+						int n;
+						boolean next = true;
+						while (next) {
+							n = Utils.readFully(is, buf);
+							next = (n == buf.length);
+							new MsgData(replyTo, (short)-1, buf, n, deflate, next).send(sok);
+						}
+					} catch (IOException ex) {
 						try {
-							is.close(); // 'is' is the DeflaterInputStream
-						} catch (IOException e) { }
+							new MsgAck(m.getReplyTo(), (short)-1, MsgAck.ERR, ex.getMessage()).send(sok);
+						} catch (IOException e) {
+							log.severe("I/O error when sending I/O error report on file GET "+name+": "+e.getMessage());
+						}
+					} finally {
+						if (defl != null) {
+							defl.end();
+							try {
+								is.close(); // 'is' is the DeflaterInputStream
+							} catch (IOException e) { }
+						}
 					}
 				}
-			}
-		});
+			});
+		} catch (RejectedExecutionException e) {
+			throw new IOException("Provider is closing... "+e.getMessage());
+		}
 	}
 	
-	private void handleFileOp(MsgFile msg) throws IOException {
+	
+	private void handleFileOp(MsgFileAction msg) throws IOException {
 		log.info(getName()+": Request FileOp "+msg);
 		
-		if (msg instanceof MsgFileList) {
-			new MsgReplyFileList(msg.getNum(), msg.getFile().listFiles(), true).send(sok); // TODO: Split if too many files
+		FileAction action = msg.getAction();
+		switch (action) {
+			case GET_ATTRIBUTES: new MsgReplyFileInfos(msg.getNum(), msg.getFile()).send(sok); break;
 			
-		} else if (msg instanceof MsgFileDelete) {
-			new MsgReplyFileLong(msg.getNum(), msg.getFile().delete() ? 1l : 0l).send(sok);
+			case LIST_FILES: new MsgReplyFileList(msg.getNum(), msg.getFile().listFiles(), true).send(sok); break;
+			case LIST_ROOTS: new MsgReplyFileList(msg.getNum(), File.listRoots(), true).send(sok); break;
 			
-		} else if (msg instanceof MsgFileMkdirs) {
-			new MsgReplyFileLong(msg.getNum(), msg.getFile().mkdirs() ? 1l : 0l).send(sok);
+			case CREATE_NEW: new MsgReplyFileLong(msg.getNum(), msg.getFile().createNewFile() ? 1l : 0l).send(sok); break;
+			case DELETE: new MsgReplyFileLong(msg.getNum(), msg.getFile().delete() ? 1l : 0l).send(sok); break;
+			case MKDIR: new MsgReplyFileLong(msg.getNum(), msg.getFile().mkdir() ? 1l : 0l).send(sok); break;
+			case MKDIRS: new MsgReplyFileLong(msg.getNum(), msg.getFile().mkdirs() ? 1l : 0l).send(sok); break;
 			
-		} else if (msg instanceof MsgFileInfos) {
-			new MsgReplyFileInfos(msg.getNum(), msg.getFile()).send(sok);
+			case RENAME: new MsgReplyFileLong(msg.getNum(), msg.getFile().renameTo(new File(((MsgFAString)msg).getValue())) ? 1l : 0l).send(sok); break;
 			
-		} else if (msg instanceof MsgFileSpace) {
-			MsgFileSpace m = (MsgFileSpace)msg;
-			long val = 0l;
-			switch (m.spaceInfo()) {
-				case LENGTH: val = m.getFile().length(); break;
-				case FREE_SPACE: val = m.getFile().getFreeSpace(); break;
-				case LAST_MODIFIED: val = m.getFile().lastModified(); break;
-				case TOTAL_SPACE: val = m.getFile().getTotalSpace(); break;
-				case USABLE_SPACE: val = m.getFile().getUsableSpace(); break;
-			}
-			new MsgReplyFileLong(m.getNum(), val).send(sok);
-		
-		} else if (msg instanceof MsgFileRoots) {
-			new MsgReplyFileList(msg.getNum(), File.listRoots(), true).send(sok);
-		
-		} else {
-			log.warning(getName()+": Unhandled FileOp message "+msg);
+			case SET_EXECUTE: new MsgReplyFileLong(msg.getNum(), msg.getFile().setExecutable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
+			case SET_LAST_MODIFIED: new MsgReplyFileLong(msg.getNum(), msg.getFile().setLastModified(((MsgFALong)msg).getValue()) ? 1l : 0l).send(sok); break;
+			case SET_READ: new MsgReplyFileLong(msg.getNum(), msg.getFile().setReadable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
+			case SET_READONLY: new MsgReplyFileLong(msg.getNum(), msg.getFile().setReadOnly() ? 1l : 0l).send(sok); break;
+			case SET_WRITE: new MsgReplyFileLong(msg.getNum(), msg.getFile().setWritable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
+			
+			case FREE_SPACE: new MsgReplyFileLong(msg.getNum(), msg.getFile().getFreeSpace()).send(sok); break;
+			case TOTAL_SPACE: new MsgReplyFileLong(msg.getNum(), msg.getFile().getTotalSpace()).send(sok); break;
+			case USABLE_SPACE: new MsgReplyFileLong(msg.getNum(), msg.getFile().getUsableSpace()).send(sok); break;
 		}
 	}
 	
@@ -548,16 +569,19 @@ public class JRFProvider extends Thread {
 				} else if (msg instanceof MsgWrite) { // Write to file: reply with MsgAck
 					handleWrite((MsgWrite)msg);
 					
-				} else if (msg instanceof MsgSkip) { // Skip in file: reply with MsgAck
-					handleSkip((MsgSkip)msg);
+				} else if (msg instanceof MsgISAction) { // Action on file: reply with MsgAck
+					handleAction((MsgISAction)msg);
+					
+				} else if (msg instanceof MsgFlush) { // Action on file: reply with MsgAck
+					handleFlush((MsgFlush)msg);
 					
 				} else if (msg instanceof MsgClose) { // Close file: no reply
 					handleClose((MsgClose)msg);
 					
-				} else if (msg instanceof MsgFile) { // Operation on java.io.File
-					handleFileOp((MsgFile)msg);
+				} else if (msg instanceof MsgFileAction) { // Operation on java.io.File
+					handleFileOp((MsgFileAction)msg);
 					
-				} else if (msg instanceof MsgGet) { // Request file content
+				} else if (msg instanceof MsgGet) { // Request file download
 					handleFileGet((MsgGet)msg);
 					
 				} else if (msg instanceof MsgPing) { // Ping reply received ("pong")

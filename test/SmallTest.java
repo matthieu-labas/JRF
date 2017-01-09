@@ -6,8 +6,8 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.Arrays;
 
+import fr.jrf.Utils;
 import fr.jrf.client.JRFClientCLI;
-import fr.jrf.msg.MsgData;
 
 public class SmallTest {
 	
@@ -93,10 +93,10 @@ public class SmallTest {
 		byte[] in = new byte[1500];
 		for (int i=0;i<in.length;i++)in[i]=(byte)i;
 //		new Random().nextBytes(in); // Random will actually make deflation bigger
-		byte[] out = MsgData.deflate(in, 0, in.length, 9);
+		byte[] out = Utils.deflate(in, 0, in.length, 9);
 		System.out.println("Before "+in.length+", after "+out.length);
 		try {
-			out = MsgData.inflate(out, out.length);
+			out = Utils.inflate(out, out.length);
 			System.out.println("Back "+out.length+", equals "+Arrays.equals(in, out));
 		} catch (IOException e) {
 			Throwable t = e.getCause();

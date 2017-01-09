@@ -135,6 +135,16 @@ public abstract class Message {
 	}
 	
 	/**
+	 * Compute the network header overhead for a given {@link Message} subclass. Useful when precise MTU
+	 * control is needed.
+	 * @param cls The {@code Message} subclass.
+	 * @return The number of bytes overhead.
+	 */
+	public static int getHeaderSize(Class<? extends Message> cls) {
+		return MARKER.length + 2+2 + 2+cls.getName().getBytes(charset).length + 4;
+	}
+	
+	/**
 	 * Send the Message on the {@code SocketChannel}.
 	 * @param sok The channel to send the Message.
 	 * @return The message number.
