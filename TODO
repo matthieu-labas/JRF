@@ -1,0 +1,5 @@
+Switch to SocketChannels and asynchronous I/O
+Use SocketFactory to use SSLSocket, UDTSocket, ...
+Implement putFile() with full deflation, as in getFile()
+Use one thread per physical disk to parallelize disk I/O (if possible, or configure it)
+Create a protocol handler for jrf://

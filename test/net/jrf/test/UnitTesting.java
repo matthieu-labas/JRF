@@ -1,3 +1,5 @@
+package net.jrf.test;
+
 import static org.junit.Assert.*;
 
 import java.io.BufferedInputStream;

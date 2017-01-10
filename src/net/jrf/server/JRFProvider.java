@@ -30,6 +30,7 @@ import java.util.zip.Deflater;
 import java.util.zip.DeflaterInputStream;
 
 import net.jrf.RemoteInputStream;
+import net.jrf.RemoteOutputStream;
 import net.jrf.Utils;
 import net.jrf.client.JRFClient;
 import net.jrf.msg.Message;

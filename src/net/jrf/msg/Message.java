@@ -29,7 +29,7 @@ import net.jrf.Utils;
  * <tr><td><strong>Type length</strong></td><td>2</td><td></td></tr>
  * <tr><td><strong>Type content</strong></td><td><em>&lt;<code>type length</code>&gt;</em></td><td>(class name)</td></tr>
  * <tr><td><strong>Body length</strong></td><td>4</td><td></td></tr>
- * <tr><td><strong>Body content</strong></td><td><em>&lt;<code>body length</code>&gt;</em></td><td></td></tr>
+ * <tr><td><strong>Body content</strong></td><td><em>&lt;<code>body length</code>&gt;</em></td><td>(as returned by {@link #encode()})</td></tr>
  * </table>
  * All sub-classes must implement {@link #encode()} and {@link #decode(byte[])} method to provide their own serialization.
  * </p>
