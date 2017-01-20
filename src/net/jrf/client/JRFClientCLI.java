@@ -39,7 +39,7 @@ import net.jrf.RemoteFile;
 public class JRFClientCLI implements Runnable {
 	
 	/** Format string to display file dates in {@code ls} commands. */
-	public static final String dateFormat = "d MMM YYYY HH:mm:ss";
+	public static final String dateFormat = "dd MMM YYYY HH:mm:ss";
 	
 	private JRFClient cli;
 	
@@ -309,7 +309,7 @@ public class JRFClientCLI implements Runnable {
 						long len = cli.getFile(rem, deflate, arg1, mtu);
 						t0 = System.currentTimeMillis() - t0;
 						long len0 = new File(arg1).length();
-						System.out.println(String.format("Copied %d bytes in %.1f s (%.1f kB/s, %.1f%% deflate)", len, t0 / 1000.0f, (len/1024.0f*1000.0f/t0), 100.0*len/len0));
+						System.out.println(String.format("Copied %d bytes in %.1fs (%.1f kB/s, %.1f%% deflate)", len, t0 / 1000.0f, (len/1024.0f*1000.0f/t0), 100.0*len/len0));
 					} catch (IOException e) {
 						System.out.println("Error while downloading "+arg1+": "+e.getMessage());
 					}
@@ -327,7 +327,7 @@ public class JRFClientCLI implements Runnable {
 						long len = cli.putFile(arg1, deflate, rem, mtu);
 						t0 = System.currentTimeMillis() - t0;
 						long len0 = new File(arg1).length();
-						System.out.println(String.format("Copied %d bytes in %.1f s (%.1f kB/s, %.1f%% deflate)", len0, t0 / 1000.0f, (len0/1024.0f*1000.0f/t0), 100.0*len/len0));
+						System.out.println(String.format("Copied %d bytes in %.1f s (%.1f kB/s, %.1f%% deflate)", len0, t0 / 1000.0f, (len0/1024.0f*1000.0f/t0), 100.0 - 100.0*len/len0));
 					} catch (IOException e) {
 						System.out.println("Error while uploading "+arg1+": "+e.getMessage());
 					}
