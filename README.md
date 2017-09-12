@@ -1,6 +1,6 @@
 ﻿# JRF - Java Remote File
 
-JRF is a client/server application that allows to extend local storage to other computers running the JRF Server. It has been designed for ultra-simplicity, **not for security!** It does not request for authentication when accessing files on a remote server, nor does it prevent access to files or directories. It has been designed for already-secured networks (e.g. LANs or inside VPNs), where file-sharing setup is tedious (or impossible). Basic access configuration/restriction should be performed on the OS, by changing rights of the user running the JRF Server.
+JRF is a client/server application that allows to extend local storage to other computers running the JRF Server. It has been designed for ultra-simplicity, **not for security!** It does not request for authentication when accessing files on a remote server, nor does it prevent access to files or directories. It should be used on already-secured networks (e.g. LANs or inside VPNs), where file-sharing setup is tedious (or impossible). Basic access configuration/restriction should be performed on the OS, by changing rights of the user running the JRF Server.
 
 It is like an insecure FTP-like file sharing runnning on a single TCP port. Its Java nature gives Java programmers access to remote files as remote `InputStream` and `OutputStream`, with the added value of optionally **compressing data exchange** to ease up network usage.
 
@@ -60,6 +60,8 @@ cli.join(); // Wait for close completion
 #### Remote File
 
 ```java
+JRFClient cli = new JRFClient(new InetSocketAddress(serverAddr, serverPort));
+cli.start();
 File f = null;
 try {
     f = new RemoteFile(cli, "/tmp/test.xml");
@@ -70,7 +72,10 @@ if (f != null) {
     f.length();
     f.delete();
     f.createNew();
+    // etc.
 }
+cli.requestStop();
+cli.join();
 ```
 
 #### Open a remote stream
@@ -94,7 +99,7 @@ try (InputStream is = cli.getRemoteInputStream(file, deflate)) {
 String file = "/etc/passwd";
 try (OutputStream os = cli.getRemoteOutputStream(file)) { // No compression
 	    // 'os' is a regular OutputStream, so write(), flush(), ...
-	    // Good luck writing to /etc/passwd though ;)
+	    // Writing to /etc/passwd could be allowed if the JRFServer is run as root!!!
 } catch (IOException e) {
     e.printStackTrace();
 }
@@ -193,7 +198,7 @@ The prompt will show both local and remote directories:
     C:\Temp <> /media/movies $ ls
     -r--  365847192 28 Dec 2015 09:12:21 idiocracy.mp4
     C:\Temp <> /media/movies $ lcd D:\Movies
-    C:\Temp <> /media/movies $ lls
+    D:\Movies <> /media/movies $ lls
     D:\Movies <> /media/movies $ get idiocracy.mp4
     Copied 365847192 bytes in 182.3s (1959.8 kB/s, 0% deflate)
     C:\Temp <> /media/movies $ lls
