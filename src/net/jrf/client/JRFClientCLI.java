@@ -2,6 +2,8 @@ package net.jrf.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -139,6 +141,20 @@ public class JRFClientCLI implements Runnable {
 		return (File.separatorChar == '\\' && path.charAt(1) == ':'); // Windows
 	}
 	
+	private static void printFile(File f) {
+		SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
+		System.out.print(f.isDirectory() ? "d" : "-");
+		System.out.print(f.canRead() ? "r" : "-");
+		System.out.print(f.canWrite() ? "w" : "-");
+		System.out.print(f.canExecute() ? "x" : "-");
+		System.out.print(' ');
+		System.out.print(String.format("%10d", f.length()));
+		System.out.print(' ');
+		System.out.print(String.format("%12s", sdf.format(new Date(f.lastModified()))));
+		System.out.print(' ');
+		System.out.println(f.getName());
+	}
+	
 	/** Starts the CLI. The method blocks until the user requested a stop. Once the method returns,
 	 * the {@link JRFClient} passed in the constructor is closed. */
 	@Override
@@ -210,36 +226,16 @@ public class JRFClientCLI implements Runnable {
 				
 				case "ls": {
 					RemoteFile[] lst = (remote == null ? RemoteFile.listRoots(cli) : remote.listFiles());
-					SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
 					for (RemoteFile f : lst) {
-						System.out.print(f.isDirectory() ? "d" : "-");
-						System.out.print(f.canRead() ? "r" : "-");
-						System.out.print(f.canWrite() ? "w" : "-");
-						System.out.print(f.canExecute() ? "x" : "-");
-						System.out.print(' ');
-						System.out.print(String.format("%10d", f.length()));
-						System.out.print(' ');
-						System.out.print(String.format("%12s", sdf.format(new Date(f.lastModified()))));
-						System.out.print(' ');
-						System.out.println(f.getName());
+						printFile(f);
 					}
 					break; }
 					
-				case "lls": {
-					SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
+				case "lls":
 					for (File f : local.listFiles()) {
-						System.out.print(f.isDirectory() ? "d" : "-");
-						System.out.print(f.canRead() ? "r" : "-");
-						System.out.print(f.canWrite() ? "w" : "-");
-						System.out.print(f.canExecute() ? "x" : "-");
-						System.out.print(' ');
-						System.out.print(f.length());
-						System.out.print(' ');
-						System.out.print(sdf.format(new Date(f.lastModified())));
-						System.out.print(' ');
-						System.out.println(f.getName());
+						printFile(f);
 					}
-					} break;
+					break;
 					
 				case "rm":
 					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
@@ -253,10 +249,12 @@ public class JRFClientCLI implements Runnable {
 					
 				case "lrm":
 					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
-					if (new File(local, arg1).delete())
+					try {
+						Files.delete(Paths.get(local.getAbsolutePath(), arg1));
 						System.out.println(arg1+" deleted.");
-					else
-						System.out.println("Could not delete "+arg1);
+					} catch (IOException e) {
+						System.out.println("Could not delete "+arg1+": "+e.getMessage());
+					}
 					break;
 					
 				case "mv":
@@ -273,10 +271,12 @@ public class JRFClientCLI implements Runnable {
 				case "lmv":
 					arg1 = (cmds.length > 1 ? cmds[1] : sc.next());
 					arg2 = (cmds.length > 2 ? cmds[2] : sc.next());
-					if (new File(arg1).renameTo(new File(arg2)))
+					try {
+						Files.move(Paths.get(arg1), Paths.get(arg2));
 						System.out.println(arg1+" renamed to "+arg2);
-					else
-						System.out.println("Could not rename "+arg1+" to "+arg2);
+					} catch (IOException e) {
+						System.out.println("Could not rename "+arg1+" to "+arg2+": "+e.getMessage());
+					}
 					break;
 					
 				case "md":
@@ -344,14 +344,14 @@ public class JRFClientCLI implements Runnable {
 										System.out.println("Compression disabled");
 									else if (deflate > 9) {
 										deflate = 9;
-										System.out.println("Compression set to maximum 9");
+										System.out.println("Compression set to maximum (9)");
 									} else
 										System.out.println("Compression set to "+deflate);
 								} catch (NumberFormatException e) {
-									System.out.println(cmds[2]+" is not a valid compression value.");
+									System.out.println(cmds[2]+" is not a valid compression value (0-9).");
 								}
 							} else
-								System.out.println("Compression set to "+(deflate > 0 ? ""+deflate : "disabled"));
+								System.out.println("Compression "+(deflate > 0 ? "set to "+deflate : "disabled"));
 							break;
 						
 						case "mtu":

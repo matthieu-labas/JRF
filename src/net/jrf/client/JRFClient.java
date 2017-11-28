@@ -320,7 +320,7 @@ public class JRFClient extends Thread {
 				try { msgQueue.wait(t); } catch (InterruptedException e) { } // Already in synchronized (msgQueue)
 				if (msgQueue.size() != sz) { // New message received
 					Message msg = msgQueue.get(sz);
-					if (msg.getReplyTo() == msgNum) { // Not for us: go back to sleep
+					if (msg.getReplyTo() == msgNum) { // Ours
 						msgQueue.remove(sz);
 						return msg;
 					}

@@ -40,18 +40,18 @@ import net.jrf.msg.MsgData;
 import net.jrf.msg.MsgFlush;
 import net.jrf.msg.MsgGet;
 import net.jrf.msg.MsgISAction;
+import net.jrf.msg.MsgISAction.StreamAction;
 import net.jrf.msg.MsgOpen;
 import net.jrf.msg.MsgPing;
 import net.jrf.msg.MsgRead;
 import net.jrf.msg.MsgWrite;
-import net.jrf.msg.MsgISAction.StreamAction;
 import net.jrf.msg.file.MsgFALong;
 import net.jrf.msg.file.MsgFAString;
 import net.jrf.msg.file.MsgFileAction;
+import net.jrf.msg.file.MsgFileAction.FileAction;
 import net.jrf.msg.file.MsgFileInfos;
 import net.jrf.msg.file.MsgFileList;
 import net.jrf.msg.file.MsgFileLong;
-import net.jrf.msg.file.MsgFileAction.FileAction;
 
 /**
  * <p>The JRF Provider is the {@link JRFClient} Server counterpart, receiving and processing file
@@ -90,8 +90,9 @@ public class JRFProvider extends Thread {
 	 * Such exchanges are processed in the background so other commands can be processed. */
 	private ExecutorService execFile;
 	
-	private volatile boolean pingSent;
-	private volatile boolean pingReceived;
+	/** Last timestamp a ping was sent. */
+	private long pingStamp;
+	private boolean pingSent;
 	
 	private volatile boolean goOn;
 	
@@ -494,78 +495,55 @@ public class JRFProvider extends Thread {
 		log.info(getName()+": Request FileOp "+msg);
 		
 		FileAction action = msg.getAction();
+		short num = msg.getNum();
+		File f = msg.getFile();
 		switch (action) {
-			case GET_ATTRIBUTES: new MsgFileInfos(msg.getNum(), msg.getFile()).send(sok); break;
+			case GET_ATTRIBUTES: new MsgFileInfos(num, f).send(sok); break;
 			
-			case LIST_FILES: new MsgFileList(msg.getNum(), msg.getFile().listFiles(), true).send(sok); break;
-			case LIST_ROOTS: new MsgFileList(msg.getNum(), File.listRoots(), true).send(sok); break;
+			case LIST_FILES: new MsgFileList(num, f.listFiles(), true).send(sok); break;
+			case LIST_ROOTS: new MsgFileList(num, File.listRoots(), true).send(sok); break;
 			
-			case CREATE_NEW: new MsgFileLong(msg.getNum(), msg.getFile().createNewFile() ? 1l : 0l).send(sok); break;
-			case DELETE: new MsgFileLong(msg.getNum(), msg.getFile().delete() ? 1l : 0l).send(sok); break;
-			case MKDIR: new MsgFileLong(msg.getNum(), msg.getFile().mkdir() ? 1l : 0l).send(sok); break;
-			case MKDIRS: new MsgFileLong(msg.getNum(), msg.getFile().mkdirs() ? 1l : 0l).send(sok); break;
+			case CREATE_NEW: new MsgFileLong(num, f.createNewFile() ? 1l : 0l).send(sok); break;
+			case DELETE: new MsgFileLong(num, f.delete() ? 1l : 0l).send(sok); break;
+			case MKDIR: new MsgFileLong(num, f.mkdir() ? 1l : 0l).send(sok); break;
+			case MKDIRS: new MsgFileLong(num, f.mkdirs() ? 1l : 0l).send(sok); break;
 			
-			case RENAME: new MsgFileLong(msg.getNum(), msg.getFile().renameTo(new File(((MsgFAString)msg).getValue())) ? 1l : 0l).send(sok); break;
+			case RENAME: new MsgFileLong(num, f.renameTo(new File(((MsgFAString)msg).getValue())) ? 1l : 0l).send(sok); break;
 			
-			case SET_EXECUTE: new MsgFileLong(msg.getNum(), msg.getFile().setExecutable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
-			case SET_LAST_MODIFIED: new MsgFileLong(msg.getNum(), msg.getFile().setLastModified(((MsgFALong)msg).getValue()) ? 1l : 0l).send(sok); break;
-			case SET_READ: new MsgFileLong(msg.getNum(), msg.getFile().setReadable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
-			case SET_READONLY: new MsgFileLong(msg.getNum(), msg.getFile().setReadOnly() ? 1l : 0l).send(sok); break;
-			case SET_WRITE: new MsgFileLong(msg.getNum(), msg.getFile().setWritable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
+			case SET_EXECUTE: new MsgFileLong(num, f.setExecutable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
+			case SET_LAST_MODIFIED: new MsgFileLong(num, f.setLastModified(((MsgFALong)msg).getValue()) ? 1l : 0l).send(sok); break;
+			case SET_READ: new MsgFileLong(num, f.setReadable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
+			case SET_READONLY: new MsgFileLong(num, f.setReadOnly() ? 1l : 0l).send(sok); break;
+			case SET_WRITE: new MsgFileLong(num, f.setWritable(((MsgFALong)msg).getValue() != 0l) ? 1l : 0l).send(sok); break;
 			
-			case FREE_SPACE: new MsgFileLong(msg.getNum(), msg.getFile().getFreeSpace()).send(sok); break;
-			case TOTAL_SPACE: new MsgFileLong(msg.getNum(), msg.getFile().getTotalSpace()).send(sok); break;
-			case USABLE_SPACE: new MsgFileLong(msg.getNum(), msg.getFile().getUsableSpace()).send(sok); break;
-		}
-	}
-	
-	// Ping message received: notify blocked threads
-	private void handlePing(MsgPing msg) {
-		if (!pingSent)
-			log.warning(getName()+": received unexpected ping");
-		pingReceived = true;
-		pingSent = false;
-		synchronized (this) {
-			notifyAll();
+			case FREE_SPACE: new MsgFileLong(num, f.getFreeSpace()).send(sok); break;
+			case TOTAL_SPACE: new MsgFileLong(num, f.getTotalSpace()).send(sok); break;
+			case USABLE_SPACE: new MsgFileLong(num, f.getUsableSpace()).send(sok); break;
 		}
 	}
 	
 	/**
-	 * Check if inactivity timeout has expired and send a ping message. Blocks until a
-	 * reply ping has been received (for a maximum of {@link #PING_TIMEOUT} ms). If no
-	 * ping is received, terminates the connection.
+	 * Check if inactivity timeout has expired and send a ping message.
+	 * @return {@code true} if a ping message was sent, {@code false} if there was no need
+	 * 		to send one yet.
 	 */
-	private void checkPing() {
-		if (pingSent)
-			return;
-		long dead = System.currentTimeMillis() - lastActivity;
+	private boolean checkPing() {
+		long t0 = System.currentTimeMillis();
+		long dead = t0 - lastActivity;
 //		log.finest(this+": "+dead+" ms inactivity");
 		if (dead < JRFServer.CLIENT_TIMEOUT)
-			return;
+			return false;
 		
 		log.fine(getName()+": No activity for "+(dead/1000)+"s. Pinging...");
-		pingReceived = false;
 		try {
 			new MsgPing().send(sok);
+			pingStamp = t0;
 			pingSent = true;
-			synchronized (this) {
-				while (!pingReceived) {
-					try {
-						wait(PING_TIMEOUT);
-						break;
-					} catch (InterruptedException e) { }
-				}
-			}
 		} catch (IOException e) {
 			log.warning(this+": Unable to send ping, closing. "+e.getMessage());
 			requestStop();
-		} finally {
-			if (!pingReceived) {
-				log.warning(getName()+": No response to ping after inactivity of "+(dead/1000)+"s. Closing...");
-				requestStop();
-			}
-			pingSent = pingReceived = false;
 		}
+		return true;
 	}
 	
 	@Override
@@ -573,9 +551,10 @@ public class JRFProvider extends Thread {
 		while (goOn) {
 			try {
 				log.fine(getName()+": waiting for message...");
-				Message msg = Message.receive(sok);
+				Message msg = Message.receive(sok); // Can SocketTimeoutException
 				log.fine(getName()+": received message "+msg);
 				lastActivity = System.currentTimeMillis();
+				pingSent = false; // Something was received, don't ping
 				
 				// Command messages
 				if (msg instanceof MsgOpen) { // Open file: reply with MsgAck to reply with file ID
@@ -603,7 +582,7 @@ public class JRFProvider extends Thread {
 					handleFileGet((MsgGet)msg);
 					
 				} else if (msg instanceof MsgPing) { // Ping reply received ("pong")
-					handlePing((MsgPing)msg);
+					// Nothing, lastActivity is now updated
 					
 				} else { // Unknown
 					log.warning(getName()+": Don't know how to handle file message "+msg);
@@ -611,6 +590,11 @@ public class JRFProvider extends Thread {
 			} catch (SocketTimeoutException e) {
 				log.finest(getName()+": timeout...");
 				checkPing(); // Ping client if needed
+				if (pingSent && lastActivity - pingStamp > PING_TIMEOUT) {
+					long dead = System.currentTimeMillis() - lastActivity;
+					log.warning(getName()+": No response to ping after inactivity of "+(dead/1000)+"s. Closing...");
+					goOn = false;
+				}
 				continue;
 			} catch (EOFException e) { // FIN received: graceful disconnection
 				log.info(getName()+": "+sok.getRemoteSocketAddress()+" disconnected. Ending.");
