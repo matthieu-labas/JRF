@@ -14,14 +14,14 @@ import java.util.logging.Logger;
 
 /**
  * <p>Class listening for connections on a {@code ServerSocket} and creating {@link JRFProvider} instances
- * on new connections.</p>
+ * on new connections.
  * <p>Several server instances can be created on different ports, if needed. The {@code main()} method
  * will create a single server running on the given @code address:port} and show a small CLI to query
  * connections:
- * <table><tr>2<th>Command</th><th>Description</th></tr>
+ * <table summary="List of commands"><tr><th>Command</th><th>Description</th></tr>
  * <tr><td><code>?</code></td><td>Query connected clients and their currently opened files</td></tr>
  * <tr><td><code>bye</code></td><td>Shutdown the server and exit</td></tr>
- * </table></p>
+ * </table>
  * 
  * @author Matthieu Labas
  */

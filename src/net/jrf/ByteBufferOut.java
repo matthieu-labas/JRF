@@ -62,7 +62,7 @@ public class ByteBufferOut extends DataOutputStream {
 	 * is written, followed by the extracted {@code byte[]}. An empty string codes only a {@code 0}
 	 * size, a {@code null} string codes only a {@code -1} size.</p>
 	 * @param str The string to write (up to 32767 bytes).
-	 * @throws IOException
+	 * @throws IOException if an I/O error occurs.
 	 */
 	public void writeString(String str) throws IOException {
 		if (str == null) {

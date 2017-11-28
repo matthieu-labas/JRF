@@ -7,8 +7,8 @@ import java.io.IOException;
 import net.jrf.ByteBufferOut;
 
 /**
- * <p>Data chunk message, used to transfer file chunks between JRF client and server.</p>
- * <p>Each data chunk can be separately compressed.</p>
+ * <p>Data chunk message, used to transfer file chunks between JRF client and server.
+ * <p>Each data chunk can be separately compressed.
  * 
  * @author Matthieu Labas
  */
@@ -39,7 +39,9 @@ public class MsgData extends MsgFileCmd {
 	 * @param replyTo The message number asking for data.
 	 * @param fileID The file {@code data} belongs to.
 	 * @param data The chunk data.
+	 * @param len The {@code data} length.
 	 * @param deflate If {@code > 0}, {@code data} should be considered deflated.
+	 * @param hasNext {@code true} if another data chunk is expected after this one.
 	 */
 	public MsgData(short replyTo, short fileID, byte[] data, int len, int deflate, boolean hasNext) {
 		super(replyTo, fileID);

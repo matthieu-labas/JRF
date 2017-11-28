@@ -57,7 +57,7 @@ public class RemoteInputStream extends InputStream {
 	 * Method called internally when a message is spontaneously sent by the remote side (e.g. hardware failure,
 	 * descriptor closed).
 	 * @param msg The message sent.
-	 * @throws IOException
+	 * @throws IOException if an I/O error occurs.
 	 */
 	public void spontaneousMessage(Message msg) throws IOException {
 		// TODO: Handle spontaneous close, etc.

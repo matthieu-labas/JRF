@@ -15,7 +15,7 @@ import net.jrf.RemoteFile;
 /**
  * <p>Command Line Interface for {@link JRFClient}. Though it implements {@code Runnable}, it is not
  * primarily designed to run in a separate Thread as it is reading from {@code System.in}.</p>
- * <p><table>
+ * <table summary="List of commands">
  * <tr><th>Command</th><th>Description</th></tr>
  * <tr><td><code>cd</code></td><td>Change remote directory</td></tr>
  * <tr><td><code>lcd</code></td><td>Change local directory</td></tr>
@@ -34,7 +34,7 @@ import net.jrf.RemoteFile;
  * 		<li><code>mtu</code> Set network chunk size.</li></ul>
  * 		</td></tr>
  * <tr><td><code>bye</code></td><td>Exit</td></tr>
- * </table></p>
+ * </table>
  * 
  * @author Matthieu Labas
  */
@@ -129,11 +129,11 @@ public class JRFClientCLI implements Runnable {
 	
 	/**
 	 * <p>Tries to determine whether the given {@code path} is an absolute path.</p>
-	 * <p>Under *nix, it's easy: {@code path} should start with a {@code '/'}.<br/>
+	 * <p>Under *nix, it's easy: {@code path} should start with a {@code '/'}.<br>
 	 * Under Windows, it's a little bit trickier (as usual...): 2nd character is {@code ':'}, 1st
 	 * being the drive letter, or 1st character is a {@code '\'} (then good luck find the drive).</p>
 	 * @param path The path to check
-	 * @return
+	 * @return {@code true} if the path looks like an absolute one.
 	 */
 	public static boolean isAbsolute(String path) {
 		if (path.charAt(0) == File.separatorChar) // Starts with '/' on *nix, or '\' on Windows

@@ -101,7 +101,7 @@ public class FileInfos {
 	 * Append this file information to the given {@code ByteBufferOut}.
 	 * @param buf The buffer to update.
 	 * @return {@code buf}.
-	 * @throws IOException
+	 * @throws IOException if an I/O error occurs.
 	 */
 	public ByteBufferOut encodeAppend(ByteBufferOut buf) throws IOException {
 		buf.writeString(name);

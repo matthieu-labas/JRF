@@ -20,9 +20,9 @@ import net.jrf.Utils;
  * <p><strong>ALL SUB CLASSES <em>MUST</em> IMPLEMENT A NULLARY CONSTRUCTOR</strong>, as it will be
  * used for intanciation through {@link Class#newInstance()}.</p>
  * 
- * <p>On the wire, the Message is transmitted as follow:
- * <table border="1" style="border-collapse:collapse">
- * <tr bgcolor="silver"><th><strong>Field</strong></th><th><strong>Size</strong></th><th></th></tr>
+ * On the wire, the Message is transmitted as follow:
+ * <table border="1" style="border-collapse:collapse" summary="Message network format">
+ * <tr><th><strong>Field</strong></th><th><strong>Size</strong></th><th></th></tr>
  * <tr><td><strong>Marker</strong></td><td>4</td><td>{@code "_JRF"}</td></tr>
  * <tr><td><strong>Message number</strong></td><td>2</td><td>Starts at {@code 1}</td></tr>
  * <tr><td><strong>Reply to</strong></td><td>2</td><td>Message number to which this message replies (<code>-1</code> if not applicable)</td></tr>
@@ -32,7 +32,6 @@ import net.jrf.Utils;
  * <tr><td><strong>Body content</strong></td><td><em>&lt;<code>body length</code>&gt;</em></td><td>(as returned by {@link #encode()})</td></tr>
  * </table>
  * All sub-classes must implement {@link #encode()} and {@link #decode(byte[])} method to provide their own serialization.
- * </p>
  * 
  * @author Matthieu Labas
  */
@@ -100,7 +99,7 @@ public abstract class Message {
 	 * Serializes the message content as a {@link ByteBufferOut} for convenient use of {@link DataOutput}
 	 * methods.
 	 * @return A byte buffer initialized with the data.
-	 * @throws IOException 
+	 * @throws IOException if an I/O error occurs.
 	 */
 	protected abstract ByteBufferOut encode() throws IOException;
 	
@@ -118,7 +117,7 @@ public abstract class Message {
 	 * }
 	 * </pre>
 	 * @param buf The buffer containing the whole body, as serialized by {@link #encode()}.
-	 * @throws IOException 
+	 * @throws IOException if an I/O error occurs.
 	 */
 	protected abstract void decode(byte[] buf) throws IOException;
 	
@@ -146,7 +145,7 @@ public abstract class Message {
 	 * Send the Message on the {@code Socket}.
 	 * @param sok The socket used to send the Message.
 	 * @return The message number.
-	 * @throws IOException
+	 * @throws IOException if an I/O error occurs.
 	 */
 	public synchronized short send(Socket sok) throws IOException {
 		ByteBufferOut bb = encode();

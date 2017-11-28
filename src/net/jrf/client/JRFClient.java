@@ -93,7 +93,7 @@ public class JRFClient extends Thread {
 	/**
 	 * Instantiate and connects a JRF Client to a {@linkplain JRFServer JRF Server}.
 	 * @param addr The address of the JRF Server to connect to.
-	 * @throws IOException
+	 * @throws IOException if an I/O error occurs during Socket creation.
 	 */
 	public JRFClient(InetSocketAddress addr) throws IOException {
 		this(new Socket(addr.getAddress(), addr.getPort()));
@@ -284,7 +284,7 @@ public class JRFClient extends Thread {
 	 * <p>Retrieve the next reply-message to the given message number, so that
 	 * {@code ret.replyTo == msgNum}. In all cases, if the message was already received, it will be
 	 * returned immediately.</p>
-	 * <p><ul>
+	 * <ul>
 	 * <li>If the given {@code timeout} is {@code < 0}, the call will return immediately the reply
 	 * message if it was already received, or {@code null} if it wasn't, which can be useful to
 	 * create an external active polling.</li>
@@ -292,7 +292,7 @@ public class JRFClient extends Thread {
 	 * thrown.</li>
 	 * <li>If {@code > 0}, the call will block at most {@code timeout} ms until the reply message is
 	 * received or an exception is thrown. If the message was not received during this {@code timeout},
-	 * {@code null} will be returned.</li></p>
+	 * {@code null} will be returned.</li></ul>
 	 * @param msgNum The message number to which a reply message was sent.
 	 * @param timeout {@code >= 0} if the call should be blocking, waiting for the reply message to
 	 * 		arrive in the given {@code timeout} ms.
@@ -336,7 +336,7 @@ public class JRFClient extends Thread {
 	 * silently discarded.
 	 * @param sok The socket to gracefully close.
 	 * @param flush {@code true} if the socket input stream should be emptied.
-	 * @see <a href="http://stackoverflow.com/a/9399617/1098603">http://stackoverflow.com/a/9399617/1098603</a> :)
+	 * @see <a href="http://stackoverflow.com/a/9399617/1098603">http://stackoverflow.com/a/9399617/1098603</a>
 	 */
 	public static void gracefulClose(Socket sok, boolean flush) {
 		if (sok.isClosed())
@@ -372,7 +372,7 @@ public class JRFClient extends Thread {
 	 * 		taken into account when calling the method.
 	 * @return The number of <em>network</em> bytes received (which can be less than the actual file length,
 	 * 		if compression is used).
-	 * @throws IOException
+	 * @throws IOException if an I/O error occurs.
 	 */
 	public long getFile(String remote, int deflate, String local, int mtu) throws IOException {
 		short num = new MsgGet(remote, deflate, mtu).send(sok);
@@ -416,7 +416,7 @@ public class JRFClient extends Thread {
 	 * 		bytes will be deflated (compressed) before being sent, resulting in smaller packets.
 	 * @return The number of <em>network</em> bytes sent (which can be less than the actual file length,
 	 * 		if compression is used).
-	 * @throws IOException
+	 * @throws IOException if an I/O error occurs.
 	 */
 	public long putFile(String local, int deflate, String remote, int mtu) throws IOException {
 		// TODO: One day, implement a deflated putFile(), as in getFile(), but requires message queuing in JRFProvider

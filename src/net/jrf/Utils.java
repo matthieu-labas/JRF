@@ -103,7 +103,7 @@ public class Utils {
 	 * @param is The {@code InputStream} to read.
 	 * @param buf The buffer to fill with data read from {@code is}.
 	 * @return The number of bytes read (up to {@code buf.length}.
-	 * @throws IOException
+	 * @throws IOException if an I/O error occurs.
 	 */
 	public static int readFully(InputStream is, byte[] buf) throws IOException {
 		int n;

@@ -65,7 +65,8 @@ public class RemoteFile extends File {
 	 * requesting file information.
 	 * @param server The connection to the remote {@code JRFProvider}.
 	 * @param pathname The absolute path of the <em>remote</em> file.
-	 * @throws IOException
+	 * @throws IOException In case of communication error with {@code server} when requesting meta
+	 * 		information.
 	 */
 	public RemoteFile(JRFClient server, String pathname) throws IOException {
 		this(server, pathname, true);

@@ -10,12 +10,12 @@ import net.jrf.msg.Message;
 
 /**
  * Reply message for {@code java.io.File} methods returning a {@code long}.
- * <p><ul>
- * <li>{@link File#length()}</li>
+ * <p>
+ * <ul><li>{@link File#length()}</li>
  * <li>{@link File#getFreeSpace()}</li>
  * <li>{@link File#getTotalSpace()}</li>
  * <li>{@link File#getUsableSpace()}</li>
- * </ul></p>
+ * </ul>
  * @author Matthieu Labas
  */
 public class MsgFileLong extends Message {
