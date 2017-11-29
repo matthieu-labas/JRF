@@ -4,7 +4,7 @@
 	<property name="base" value="JRF" />
 	<property name="version" value="1.0.1" />
 	
-	<property name="debug" value="no" />
+	<property name="debug" value="yes" />
 	<property name="debuglevel" value="lines,source" />
 	<property name="optimize" value="yes" />
 	
@@ -18,14 +18,14 @@
 		<property name="outc" value="./out/bin.javac" />
 		<mkdir dir="${outc}" />
 		<javac source="1.7" target="1.7" encoding="UTF8" srcdir="src" destdir="${outc}" includeantruntime="no" debug="${debug}" debuglevel="${debuglevel}" optimize="${optimize}" />
-		<jar basedir="${outc}" destfile="${out}/${base}-v${version}.jar" />
+		<jar basedir="${outc}" destfile="${out}/${base}-${version}.jar" />
 		<delete dir="${outc}" />
 	</target>
 	
 	<target name="doc" depends="_mkdir">
 		<delete dir="javadoc" failonerror="no" />
 		<javadoc sourcepath="src" destdir="javadoc" charset="UTF8" encoding="UTF8" author="true" />
-		<jar basedir="javadoc" destfile="${out}/${base}-v${version}-javadoc.jar" />
+		<jar basedir="javadoc" destfile="${out}/${base}-${version}-javadoc.jar" />
 	</target>
 	
 	<target name="src" depends="_mkdir">
